@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Guild {
+  id                        String    @id @default(uuid())
+  discordGuildId            String    @unique
+  studyRoomTriggerChannelId String?
+  studyRoomCategoryId       String?
+  maxStudyRoomsPerGuild     Int       @default(10)
+  createdAt                 DateTime  @default(now())
+
+  quizSessions     QuizSession[]
+  studyRooms       StudyRoom[]
+  pomodoroSessions PomodoroSession[]
+
+  @@index([discordGuildId])
+}
+
+model User {
+  id            String    @id @default(uuid())
+  discordUserId String    @unique
+  username      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  quizSessions     QuizSession[]
+  studyRooms       StudyRoom[]
+  pomodoroSessions PomodoroSession[]
+
+  @@index([discordUserId])
+}
+
+model QuizSession {
+  id              String    @id @default(uuid())
+  userId          String
+  guildId         String
+  topic           String    @db.VarChar(200)
+  totalQuestions  Int       @default(0)
+  correctAnswers  Int       @default(0)
+  createdAt       DateTime  @default(now())
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild     Guild         @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+
+  @@index([userId])
+  @@index([guildId])
+}
+
+model QuizQuestion {
+  id             String   @id @default(uuid())
+  quizSessionId  String
+  question       String
+  options        Json     // [{label: "A", text: "..."}, ...]
+  correctOption  String   // "A" | "B" | "C" | "D"
+  userAnswer     String?
+  isCorrect      Boolean?
+  explanation    String
+  answeredAt     DateTime?
+
+  quizSession QuizSession @relation(fields: [quizSessionId], references: [id], onDelete: Cascade)
+
+  @@index([quizSessionId])
+}
+
+model StudyRoom {
+  id         String   @id @default(uuid())
+  guildId    String
+  channelId  String   @unique
+  ownerId    String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, isActive])
+}
+
+model PomodoroSession {
+  id           String    @id @default(uuid())
+  userId       String
+  guildId      String
+  channelId    String
+  workMinutes  Int       @default(25)
+  breakMinutes Int       @default(5)
+  status       String    @default("WORK") // "WORK" | "BREAK" | "STOPPED"
+  startedAt    DateTime  @default(now())
+  endsAt       DateTime
+  stoppedAt    DateTime?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([channelId])
+}
