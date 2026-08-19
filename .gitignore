@@ -1,8 +1,39 @@
+# Dependencies & Package Managers
 node_modules/
+package-lock.json.backup
+
+# Production Build Output
 dist/
+build/
+
+# Environment & Secrets (TUYỆT ĐỐI BẢO VỆ)
 .env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Testing & Coverage
+coverage/
+*.lcov
+
+# Logs & Debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor Metadata
 .DS_Store
-coverage/
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+
+# AI Agent Metadata & Scratchpad (Giữ Repo Sạch Cho CV)
+.agents/
+.gemini/
+prompt.md
