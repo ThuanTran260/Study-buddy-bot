@@ -119,7 +119,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .setDescription(`Đáp án đúng: **${q.correctOption}**\n*Giải thích:* ${q.explanation}`)
           .setColor(isCorrect ? 0x57f287 : 0xed4245);
 
-        await interaction.followUp({ embeds: [feedbackEmbed], ephemeral: true });
+        await interaction.followUp({ embeds: [feedbackEmbed], ephemeral: true, allowedMentions: { parse: [] } });
 
         currentIndex++;
         if (currentIndex < questions.length) {
@@ -136,7 +136,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             .setDescription(`Điểm số: **${correctCount}/${questions.length}** (${score.percentage}%)\nXếp loại: **Hạng ${score.grade}**`)
             .setColor(score.percentage >= 70 ? 0x57f287 : 0xfee75c);
 
-          await interaction.editReply({ embeds: [finalEmbed], components: [] });
+          await interaction.editReply({ embeds: [finalEmbed], components: [], allowedMentions: { parse: [] } });
         }
       });
 
