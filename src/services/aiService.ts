@@ -36,11 +36,11 @@ async function callAI({
     if (env.aiProvider === 'gemini' && geminiClient) {
       // Gọi Google Gemini API (Miễn phí)
       const response = await geminiClient.models.generateContent({
-        model: env.aiModel || 'gemini-1.5-flash',
+        model: env.aiModel || 'gemini-3.6-flash',
         contents: userMessage,
         config: {
           systemInstruction: systemPrompt,
-          maxOutputTokens: maxTokens,
+          maxOutputTokens: Math.max(maxTokens, 2048),
           responseMimeType: jsonMode ? 'application/json' : 'text/plain',
         },
       });
