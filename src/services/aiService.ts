@@ -10,7 +10,7 @@ Quy tắc bắt buộc:
 2. Không trả lời các câu hỏi về nội dung bạo lực, kích động, vi phạm pháp luật.
 3. Tập trung vào mục tiêu học tập và giáo dục.`;
 
-const AI_TIMEOUT_MS = 15_000;
+const AI_TIMEOUT_MS = 25_000;
 
 // Khởi tạo clients
 const openaiClient = env.aiApiKey ? new OpenAI({ apiKey: env.aiApiKey }) : null;
@@ -36,7 +36,7 @@ async function callAI({
     if (env.aiProvider === 'gemini' && geminiClient) {
       // Gọi Google Gemini API (Miễn phí)
       const response = await geminiClient.models.generateContent({
-        model: env.aiModel || 'gemini-3.6-flash',
+        model: env.aiModel || 'gemini-3.5-flash',
         contents: userMessage,
         config: {
           systemInstruction: systemPrompt,
@@ -69,7 +69,7 @@ async function callAI({
     if ((error as Error).name === 'AbortError') {
       throw new Error('AI_TIMEOUT');
     }
-    logger.error('AI API Error', { provider: env.aiProvider, error: String(error) });
+    logger.error('AI API Error', { provider: env.aiProvider, model: env.aiModel, error: String(error) });
     throw error;
   } finally {
     clearTimeout(timeoutId);

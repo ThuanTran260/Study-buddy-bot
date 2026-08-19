@@ -38,10 +38,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await interaction.followUp({ content: chunk, allowedMentions: { parse: [] } });
     }
   } catch (error) {
-    const msg = (error as Error).message === 'AI_TIMEOUT'
-      ? '⏱️ AI mất quá nhiều thời gian phản hồi (timeout 15s). Vui lòng thử lại sau.'
-      : '❌ Có lỗi xảy ra khi gọi AI.';
+    const errorStr = (error as Error).message || String(error);
+    const msg = errorStr === 'AI_TIMEOUT'
+      ? '⏱️ AI mất quá nhiều thời gian phản hồi (> 25s). Vui lòng thử lại sau.'
+      : `❌ Có lỗi xảy ra khi gọi AI. Vui lòng thử lại sau.`;
     logger.error('Command /hoi failed', { userId: interaction.user.id, error: String(error) });
-    await interaction.editReply({ content: msg });
+    await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
   }
 }

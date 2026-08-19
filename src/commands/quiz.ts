@@ -155,7 +155,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await sendQuestion(0);
   } catch (error) {
+    const errorStr = (error as Error).message || String(error);
+    const msg = errorStr === 'AI_TIMEOUT'
+      ? '⏱️ AI mất quá nhiều thời gian tạo bộ câu hỏi (> 25s). Vui lòng thử lại sau.'
+      : '❌ Có lỗi xảy ra khi tạo quiz. Vui lòng thử lại sau.';
     logger.error('Error in /quiz', { error: String(error) });
-    await interaction.editReply({ content: '❌ Có lỗi xảy ra khi tạo quiz.' });
+    await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
   }
 }

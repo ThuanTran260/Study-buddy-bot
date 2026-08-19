@@ -38,7 +38,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await interaction.followUp({ content: chunk, allowedMentions: { parse: [] } });
     }
   } catch (error) {
+    const errorStr = (error as Error).message || String(error);
+    const msg = errorStr === 'AI_TIMEOUT'
+      ? '⏱️ AI mất quá nhiều thời gian phản hồi (> 25s). Vui lòng thử lại sau.'
+      : '❌ Không thể tóm tắt văn bản lúc này. Vui lòng thử lại sau.';
     logger.error('Command /tomtat failed', { userId: interaction.user.id, error: String(error) });
-    await interaction.editReply({ content: '❌ Không thể tóm tắt văn bản. Vui lòng thử lại sau.' });
+    await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
   }
 }
