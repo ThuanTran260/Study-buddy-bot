@@ -11,7 +11,7 @@ export function registerHealthClient(client: Client): void {
 
 export function startHealthServer(port: number = 3000): http.Server {
   serverInstance = http.createServer((req, res) => {
-    if (req.url !== '/health') {
+    if (req.url !== '/health' && req.url !== '/') {
       res.writeHead(404);
       res.end();
       return;
