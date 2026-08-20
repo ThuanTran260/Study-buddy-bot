@@ -17,6 +17,62 @@ const AI_TIMEOUT_MS = 25_000;
 const openaiClient = env.aiApiKey ? new OpenAI({ apiKey: env.aiApiKey }) : null;
 const geminiClient = env.aiApiKey ? new GoogleGenAI({ apiKey: env.aiApiKey }) : null;
 
+/**
+ * Bóc tách chuỗi JSON hợp lệ kể cả khi AI trả về thừa dấu ngoặc hoặc markdown bao quanh
+ */
+export function extractValidJson(raw: string): string {
+  const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+
+  // Nếu chuỗi bắt đầu bằng mảng '['
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = firstBracket; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (char === '[') depth++;
+        else if (char === ']') {
+          depth--;
+          if (depth === 0) return cleaned.slice(firstBracket, i + 1);
+        }
+      }
+    }
+    const lastBracket = cleaned.lastIndexOf(']');
+    if (lastBracket > firstBracket) return cleaned.slice(firstBracket, lastBracket + 1);
+    return cleaned;
+  }
+
+  // Nếu chuỗi bắt đầu bằng đối tượng '{'
+  if (firstBrace !== -1) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = firstBrace; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      if (escape) { escape = false; continue; }
+      if (char === '\\') { escape = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (char === '{') depth++;
+        else if (char === '}') {
+          depth--;
+          if (depth === 0) return cleaned.slice(firstBrace, i + 1);
+        }
+      }
+    }
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (lastBrace > firstBrace) return cleaned.slice(firstBrace, lastBrace + 1);
+  }
+
+  return cleaned;
+}
+
 async function callAI({
   systemPrompt,
   userMessage,
@@ -37,7 +93,6 @@ async function callAI({
     let answer = '';
 
     if (env.aiProvider === 'gemini' && geminiClient) {
-      // 🧠 Multi-turn format cho Google Gemini
       let contents: any;
       if (history.length > 0) {
         contents = [
@@ -62,7 +117,6 @@ async function callAI({
       });
       answer = response.text || '';
     } else if (openaiClient) {
-      // 🧠 Multi-turn format cho OpenAI
       const messages: any[] = [{ role: 'system', content: systemPrompt }];
       for (const h of history) {
         messages.push({
@@ -106,9 +160,6 @@ export async function askAI(userQuestion: string): Promise<string> {
   });
 }
 
-/**
- * Hỏi đáp AI có ghi nhớ ngữ cảnh hội thoại
- */
 export async function askAIWithContext(
   userQuestion: string,
   history: ConversationMessage[]
@@ -150,21 +201,48 @@ const VALID_OPTIONS = new Set(['A', 'B', 'C', 'D']);
 
 export function parseAIJsonResponse(raw: string): QuizQuestionData[] | null {
   try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const jsonStr = extractValidJson(raw);
+    const parsed = JSON.parse(jsonStr);
     const list = Array.isArray(parsed) ? parsed : parsed.questions;
 
     if (!Array.isArray(list)) return null;
 
-    const valid = list.every(
-      (q) =>
-        typeof q.question === 'string' &&
-        Array.isArray(q.options) &&
-        q.options.length === 4 &&
-        VALID_OPTIONS.has(q.correctOption) &&
-        typeof q.explanation === 'string'
-    );
-    return valid ? (list as QuizQuestionData[]) : null;
+    const valid: QuizQuestionData[] = [];
+    for (const q of list) {
+      if (!q || typeof q.question !== 'string') continue;
+
+      let options: { label: string; text: string }[] = [];
+      if (Array.isArray(q.options)) {
+        if (q.options.length === 4 && typeof q.options[0] === 'object' && q.options[0]?.label) {
+          options = q.options.map((o: any) => ({
+            label: o.label.toString().toUpperCase().trim(),
+            text: o.text.toString().trim(),
+          }));
+        } else if (q.options.length === 4 && typeof q.options[0] === 'string') {
+          const labels = ['A', 'B', 'C', 'D'];
+          options = q.options.map((optText: string, idx: number) => ({
+            label: labels[idx],
+            text: optText.replace(/^[A-D][\.\:\)\-]\s*/i, '').trim(),
+          }));
+        }
+      }
+
+      const rawCorrect = (q.correctOption || 'A').toString().trim().toUpperCase();
+      const firstChar = rawCorrect.charAt(0);
+      const correctOption = VALID_OPTIONS.has(firstChar) ? (firstChar as 'A' | 'B' | 'C' | 'D') : 'A';
+      const explanation = (q.explanation || 'Đáp án đúng theo bài học.').toString().trim();
+
+      if (options.length === 4) {
+        valid.push({
+          question: q.question.trim(),
+          options,
+          correctOption,
+          explanation,
+        });
+      }
+    }
+
+    return valid.length > 0 ? valid : null;
   } catch {
     return null;
   }
@@ -188,23 +266,22 @@ export interface FlashcardItemData {
 
 export function parseFlashcardAIResponse(raw: string): FlashcardItemData[] | null {
   try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const jsonStr = extractValidJson(raw);
+    const parsed = JSON.parse(jsonStr);
     const list = Array.isArray(parsed) ? parsed : parsed.flashcards;
 
     if (!Array.isArray(list) || list.length === 0) return null;
 
-    const valid = list.every(
-      (item) =>
-        typeof item.front === 'string' &&
-        item.front.trim().length > 0 &&
-        item.front.length <= 1000 &&
-        typeof item.back === 'string' &&
-        item.back.trim().length > 0 &&
-        item.back.length <= 1000
-    );
+    const valid: FlashcardItemData[] = [];
+    for (const item of list) {
+      const front = (item.front || item.term || item.question || '').toString().trim();
+      const back = (item.back || item.definition || item.answer || '').toString().trim();
+      if (front && back && front.length <= 1000 && back.length <= 1000) {
+        valid.push({ front, back });
+      }
+    }
 
-    return valid ? (list as FlashcardItemData[]) : null;
+    return valid.length > 0 ? valid : null;
   } catch {
     return null;
   }
@@ -224,7 +301,7 @@ export async function generateStudyPackJson(documentContent: string): Promise<st
   return callAI({
     systemPrompt: `${BASE_SYSTEM_PROMPT}
 4. Bạn là cố vấn học tập cao cấp. Hãy phân tích kỹ tài liệu bài giảng được cung cấp và trích xuất trọn bộ tài liệu ôn tập Study Pack.
-5. Trả về JSON bắt buộc theo cấu trúc:
+5. Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc:
 {
   "summary": "Tóm tắt 3-4 điểm chính cốt lõi nhất của tài liệu dạng gạch đầu dòng (•)",
   "flashcards": [
@@ -247,24 +324,103 @@ export async function generateStudyPackJson(documentContent: string): Promise<st
 
 export function parseStudyPackResponse(raw: string): StudyPackData | null {
   try {
-    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
+    const jsonStr = extractValidJson(raw);
+    const parsed = JSON.parse(jsonStr);
 
-    if (!parsed || typeof parsed.summary !== 'string') return null;
+    if (!parsed) return null;
 
-    const flashcards = parseFlashcardAIResponse(JSON.stringify(parsed.flashcards));
-    const quiz = parseAIJsonResponse(JSON.stringify(parsed.quiz));
+    // 1. Chuẩn hóa summary
+    let summary = '';
+    if (typeof parsed.summary === 'string') {
+      summary = parsed.summary.trim();
+    } else if (Array.isArray(parsed.summary)) {
+      summary = parsed.summary.join('\n').trim();
+    }
 
-    if (!flashcards || flashcards.length === 0 || !quiz || quiz.length === 0) {
+    if (!summary) return null;
+
+    // 2. Chuẩn hóa flashcards
+    const rawCards = Array.isArray(parsed.flashcards)
+      ? parsed.flashcards
+      : Array.isArray(parsed.cards)
+      ? parsed.cards
+      : [];
+
+    const flashcards: FlashcardItemData[] = [];
+    for (const c of rawCards) {
+      const front = (c.front || c.term || c.question || '').toString().trim();
+      const back = (c.back || c.definition || c.answer || '').toString().trim();
+      if (front && back) {
+        flashcards.push({
+          front: front.slice(0, 1000),
+          back: back.slice(0, 1000),
+        });
+      }
+    }
+
+    // 3. Chuẩn hóa quiz
+    const rawQuiz = Array.isArray(parsed.quiz)
+      ? parsed.quiz
+      : Array.isArray(parsed.questions)
+      ? parsed.questions
+      : [];
+
+    const quiz: QuizQuestionData[] = [];
+    for (const q of rawQuiz) {
+      if (!q || typeof q.question !== 'string') continue;
+
+      let options: { label: string; text: string }[] = [];
+      if (Array.isArray(q.options)) {
+        if (q.options.length === 4 && typeof q.options[0] === 'object' && q.options[0]?.label) {
+          options = q.options.map((o: any) => ({
+            label: o.label.toString().toUpperCase().trim(),
+            text: o.text.toString().trim(),
+          }));
+        } else if (q.options.length === 4 && typeof q.options[0] === 'string') {
+          const labels = ['A', 'B', 'C', 'D'];
+          options = q.options.map((optText: string, idx: number) => ({
+            label: labels[idx],
+            text: optText.replace(/^[A-D][\.\:\)\-]\s*/i, '').trim(),
+          }));
+        }
+      } else if (typeof q.options === 'object' && q.options !== null) {
+        const labels = ['A', 'B', 'C', 'D'];
+        for (const l of labels) {
+          if (q.options[l] || q.options[l.toLowerCase()]) {
+            options.push({
+              label: l,
+              text: (q.options[l] || q.options[l.toLowerCase()]).toString().trim(),
+            });
+          }
+        }
+      }
+
+      const rawCorrect = (q.correctOption || q.answer || 'A').toString().trim().toUpperCase();
+      const firstChar = rawCorrect.charAt(0);
+      const correctOption = VALID_OPTIONS.has(firstChar) ? (firstChar as 'A' | 'B' | 'C' | 'D') : 'A';
+      const explanation = (q.explanation || q.reason || 'Đáp án đúng theo bài học.').toString().trim();
+
+      if (options.length === 4) {
+        quiz.push({
+          question: q.question.trim(),
+          options,
+          correctOption,
+          explanation,
+        });
+      }
+    }
+
+    if (flashcards.length === 0 || quiz.length === 0) {
       return null;
     }
 
     return {
-      summary: parsed.summary,
+      summary,
       flashcards,
       quiz,
     };
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to parse study pack JSON', { error: String(error) });
     return null;
   }
 }
