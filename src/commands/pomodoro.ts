@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, VoiceChannel, GuildMember } from 'discord.js';
 import { PomodoroStateMachine, PomodoroStatus, activeTimers, safeRenameChannel } from '../services/pomodoroService';
+import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
 
 export const data = new SlashCommandBuilder()
@@ -72,9 +73,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       },
     });
 
+    // Cập nhật chuỗi Streak học tập cho User
+    await recordUserActivity(interaction.user.id, interaction.user.username);
+
     await safeRenameChannel(voiceChannel, `🍅 Tập trung (${workMins}m)`);
     await interaction.editReply({
-      content: `🍅 **Bắt đầu Pomodoro**: ${workMins} phút học, ${breakMins} phút nghỉ. Chúc bạn học tốt!`,
+      content: `🍅 **Bắt đầu Pomodoro**: ${workMins} phút học, ${breakMins} phút nghỉ. Chúc bạn học tốt!\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`,
     });
 
     const runTimer = () => {

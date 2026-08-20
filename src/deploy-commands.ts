@@ -4,18 +4,34 @@ import { data as hoiData } from './commands/hoi';
 import { data as tomtatData } from './commands/tomtat';
 import { data as pomodoroData } from './commands/pomodoro';
 import { data as quizData } from './commands/quiz';
+import { data as helpData } from './commands/help';
+import { data as configData } from './commands/config';
+import { data as profileData } from './commands/profile';
+import { data as digestData } from './commands/digest';
+import { data as flashcardData } from './commands/flashcard';
 
-const commands = [hoiData.toJSON(), tomtatData.toJSON(), pomodoroData.toJSON(), quizData.toJSON()];
+const commands = [
+  hoiData.toJSON(),
+  tomtatData.toJSON(),
+  pomodoroData.toJSON(),
+  quizData.toJSON(),
+  helpData.toJSON(),
+  configData.toJSON(),
+  profileData.toJSON(),
+  digestData.toJSON(),
+  flashcardData.toJSON(),
+];
+
 const rest = new REST().setToken(env.discordToken);
 
 (async () => {
   try {
     if (env.guildId) {
-      console.log(`🚀 Đang đăng ký Slash Commands cho Guild ID: ${env.guildId}...`);
+      console.log(`🚀 Đang đăng ký ${commands.length} Slash Commands cho Guild ID: ${env.guildId}...`);
       await rest.put(Routes.applicationGuildCommands(env.clientId, env.guildId), { body: commands });
-      console.log('✅ Đã đăng ký thành công toàn bộ Slash Commands vào Server của bạn!');
+      console.log('✅ Đã đăng ký thành công toàn bộ 9 Slash Commands vào Server của bạn!');
     } else {
-      console.log('🌍 Đang đăng ký Global Slash Commands (có thể mất tối đa 1 giờ để đồng bộ)...');
+      console.log(`🌍 Đang đăng ký ${commands.length} Global Slash Commands...`);
       await rest.put(Routes.applicationCommands(env.clientId), { body: commands });
       console.log('✅ Đã đăng ký Global Commands thành công!');
     }

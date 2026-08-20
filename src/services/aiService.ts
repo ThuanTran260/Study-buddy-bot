@@ -132,3 +132,43 @@ export function parseAIJsonResponse(raw: string): QuizQuestionData[] | null {
     return null;
   }
 }
+
+export async function generateFlashcardsJson(topic: string, count: number): Promise<string> {
+  return callAI({
+    systemPrompt: `${BASE_SYSTEM_PROMPT}\n4. Bạn là chuyên gia tạo Flashcard học tập. Hãy tạo các thẻ học ghi nhớ chất lượng cao.
+5. Trả về JSON theo định dạng bắt buộc:
+{"flashcards": [{"front": "Khái niệm / Câu hỏi / Từ vựng ngắn gọn (mặt trước)", "back": "Định nghĩa / Giải nghĩa / Ví dụ chi tiết (mặt sau)"}]}`,
+    userMessage: `Tạo ${count} flashcard học tập chất lượng cao về chủ đề: ${topic}`,
+    maxTokens: 300 * count,
+    jsonMode: true,
+  });
+}
+
+export interface FlashcardItemData {
+  front: string;
+  back: string;
+}
+
+export function parseFlashcardAIResponse(raw: string): FlashcardItemData[] | null {
+  try {
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+    const list = Array.isArray(parsed) ? parsed : parsed.flashcards;
+
+    if (!Array.isArray(list) || list.length === 0) return null;
+
+    const valid = list.every(
+      (item) =>
+        typeof item.front === 'string' &&
+        item.front.trim().length > 0 &&
+        item.front.length <= 1000 &&
+        typeof item.back === 'string' &&
+        item.back.trim().length > 0 &&
+        item.back.length <= 1000
+    );
+
+    return valid ? (list as FlashcardItemData[]) : null;
+  } catch {
+    return null;
+  }
+}

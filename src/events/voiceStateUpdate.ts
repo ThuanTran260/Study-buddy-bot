@@ -11,7 +11,7 @@ export const name = Events.VoiceStateUpdate;
 export async function execute(oldState: VoiceState, newState: VoiceState): Promise<void> {
   const guild = newState.guild;
 
-  // AUTO CREATE STUDY ROOM
+  // AUTO CREATE STUDY ROOM (Chỉ chạy khi user join đúng kênh trigger)
   if (newState.channelId && newState.member) {
     const guildDb = await prisma.guild.findUnique({
       where: { discordGuildId: guild.id },
@@ -20,12 +20,31 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
     if (guildDb?.studyRoomTriggerChannelId && newState.channelId === guildDb.studyRoomTriggerChannelId) {
       const userId = newState.member.id;
 
+      // 1. Kiểm tra trần số lượng phòng voice đang mở của server
+      const activeRoomsCount = await prisma.studyRoom.count({
+        where: { guildId: guildDb.id, isActive: true },
+      });
+
+      const maxCap = guildDb.maxStudyRoomsPerGuild ?? 10;
+      if (activeRoomsCount >= maxCap) {
+        logger.warn('Study room cap reached for guild', { guildId: guild.id, cap: maxCap });
+        // Gửi tin nhắn DM thông báo lý do rõ ràng trước khi ngắt kết nối
+        await newState.member.send(
+          `⚠️ Server **${guild.name}** hiện đã đạt giới hạn tối đa **${maxCap} phòng học tự động** cùng lúc. Vui lòng quay lại sau khi có phòng trống!`
+        ).catch(() => {}); // Nuốt lỗi an toàn nếu user tắt DM
+
+        await newState.member.voice.setChannel(null).catch(() => {});
+        return;
+      }
+
+      // 2. Cooldown check
       const lastCreated = roomCreationCooldown.get(userId);
       if (lastCreated && Date.now() - lastCreated < COOLDOWN_MS) {
         await newState.member.voice.setChannel(null).catch(() => {});
         return;
       }
 
+      // 3. In-flight race condition guard
       if (pendingCreations.has(userId)) return;
       pendingCreations.add(userId);
 

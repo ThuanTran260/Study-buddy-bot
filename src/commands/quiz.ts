@@ -9,7 +9,8 @@ import {
 } from 'discord.js';
 import { generateQuizJson, parseAIJsonResponse } from '../services/aiService';
 import { calculateScore, isValidQuizTopic } from '../services/quizService';
-import { quizRateLimiter } from '../utils/rateLimiter';
+import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
+import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
 
@@ -20,7 +21,14 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption((opt) => opt.setName('so_cau').setDescription('Số câu hỏi (1 - 5)').setMinValue(1).setMaxValue(5));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const limitResult = quizRateLimiter.check(interaction.user.id);
+  const userRecord = await prisma.user.upsert({
+    where: { discordUserId: interaction.user.id },
+    create: { discordUserId: interaction.user.id, username: interaction.user.username },
+    update: { username: interaction.user.username },
+  });
+
+  // Kiểm tra DB Rate Limiter cho AI Quiz
+  const limitResult = await checkDbRateLimit(userRecord.id, 'AI_QUIZ');
   if (!limitResult.allowed) {
     await interaction.reply({ content: limitResult.message!, ephemeral: true });
     return;
@@ -45,22 +53,21 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     }
 
-    const userRecord = await prisma.user.upsert({
-      where: { discordUserId: interaction.user.id },
-      create: { discordUserId: interaction.user.id, username: interaction.user.username },
-      update: { username: interaction.user.username },
-    });
+    await recordDbAiUsage(userRecord.id, 'AI_QUIZ');
 
-    const guildRecord = await prisma.guild.upsert({
-      where: { discordGuildId: interaction.guildId! },
-      create: { discordGuildId: interaction.guildId! },
-      update: {},
-    });
+    let guildRecord = null;
+    if (interaction.guildId) {
+      guildRecord = await prisma.guild.upsert({
+        where: { discordGuildId: interaction.guildId },
+        create: { discordGuildId: interaction.guildId },
+        update: {},
+      });
+    }
 
     const session = await prisma.quizSession.create({
       data: {
         userId: userRecord.id,
-        guildId: guildRecord.id,
+        guildId: guildRecord?.id ?? null,
         topic,
         totalQuestions: questions.length,
       },
@@ -131,9 +138,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             data: { correctAnswers: correctCount },
           });
 
+          // Cập nhật chuỗi Streak học tập cho User
+          await recordUserActivity(interaction.user.id, interaction.user.username);
+
           const finalEmbed = new EmbedBuilder()
             .setTitle(`🎉 Kết quả Quiz: ${topic}`)
-            .setDescription(`Điểm số: **${correctCount}/${questions.length}** (${score.percentage}%)\nXếp loại: **Hạng ${score.grade}**`)
+            .setDescription(`Điểm số: **${correctCount}/${questions.length}** (${score.percentage}%)\nXếp loại: **Hạng ${score.grade}**\n\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`)
             .setColor(score.percentage >= 70 ? 0x57f287 : 0xfee75c);
 
           await interaction.editReply({ embeds: [finalEmbed], components: [], allowedMentions: { parse: [] } });

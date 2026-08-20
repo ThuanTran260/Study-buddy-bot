@@ -4,12 +4,22 @@ import * as hoiCommand from '../commands/hoi';
 import * as tomtatCommand from '../commands/tomtat';
 import * as pomodoroCommand from '../commands/pomodoro';
 import * as quizCommand from '../commands/quiz';
+import * as helpCommand from '../commands/help';
+import * as configCommand from '../commands/config';
+import * as profileCommand from '../commands/profile';
+import * as digestCommand from '../commands/digest';
+import * as flashcardCommand from '../commands/flashcard';
 
 const commands = new Map<string, any>([
   ['hoi', hoiCommand],
   ['tomtat', tomtatCommand],
   ['pomodoro', pomodoroCommand],
   ['quiz', quizCommand],
+  ['help', helpCommand],
+  ['config', configCommand],
+  ['profile', profileCommand],
+  ['digest', digestCommand],
+  ['flashcard', flashcardCommand],
 ]);
 
 export const name = Events.InteractionCreate;

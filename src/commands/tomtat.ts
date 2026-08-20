@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { summarizeText } from '../services/aiService';
 import { splitForEmbedAndFollowUp } from '../utils/messageSplitter';
-import { aiRateLimiter } from '../utils/rateLimiter';
+import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
+import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -12,7 +13,13 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const limitResult = aiRateLimiter.check(interaction.user.id);
+  const user = await prisma.user.upsert({
+    where: { discordUserId: interaction.user.id },
+    create: { discordUserId: interaction.user.id, username: interaction.user.username },
+    update: { username: interaction.user.username },
+  });
+
+  const limitResult = await checkDbRateLimit(user.id, 'AI_SUMMARIZE');
   if (!limitResult.allowed) {
     await interaction.reply({ content: limitResult.message!, ephemeral: true });
     return;
@@ -23,6 +30,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   try {
     const summary = await summarizeText(text);
+    await recordDbAiUsage(user.id, 'AI_SUMMARIZE');
+
     const { embedChunk, followUpChunks } = splitForEmbedAndFollowUp(summary);
 
     const embed = new EmbedBuilder()

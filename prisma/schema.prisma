@@ -14,26 +14,32 @@ model Guild {
   discordGuildId            String    @unique
   studyRoomTriggerChannelId String?
   studyRoomCategoryId       String?
+  adminLogChannelId         String?
   maxStudyRoomsPerGuild     Int       @default(10)
   createdAt                 DateTime  @default(now())
 
   quizSessions     QuizSession[]
   studyRooms       StudyRoom[]
   pomodoroSessions PomodoroSession[]
+  flashcardDecks   FlashcardDeck[]
 
   @@index([discordGuildId])
 }
 
 model User {
-  id            String    @id @default(uuid())
-  discordUserId String    @unique
-  username      String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  discordUserId  String    @unique
+  username       String
+  streakCount    Int       @default(0)
+  lastActiveDate DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   quizSessions     QuizSession[]
   studyRooms       StudyRoom[]
   pomodoroSessions PomodoroSession[]
+  flashcardDecks   FlashcardDeck[]
+  aiUsageLogs      AiUsageLog[]
 
   @@index([discordUserId])
 }
@@ -41,14 +47,14 @@ model User {
 model QuizSession {
   id              String    @id @default(uuid())
   userId          String
-  guildId         String
+  guildId         String?
   topic           String    @db.VarChar(200)
   totalQuestions  Int       @default(0)
   correctAnswers  Int       @default(0)
   createdAt       DateTime  @default(now())
 
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guild     Guild         @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  guild     Guild?        @relation(fields: [guildId], references: [id], onDelete: SetNull)
   questions QuizQuestion[]
 
   @@index([userId])
@@ -59,8 +65,8 @@ model QuizQuestion {
   id             String   @id @default(uuid())
   quizSessionId  String
   question       String
-  options        Json     // [{label: "A", text: "..."}, ...]
-  correctOption  String   // "A" | "B" | "C" | "D"
+  options        Json
+  correctOption  String
   userAnswer     String?
   isCorrect      Boolean?
   explanation    String
@@ -69,6 +75,49 @@ model QuizQuestion {
   quizSession QuizSession @relation(fields: [quizSessionId], references: [id], onDelete: Cascade)
 
   @@index([quizSessionId])
+}
+
+model FlashcardDeck {
+  id          String      @id @default(uuid())
+  userId      String
+  guildId     String?
+  name        String      @db.VarChar(100)
+  description String?
+  createdAt   DateTime    @default(now())
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guild Guild?      @relation(fields: [guildId], references: [id], onDelete: SetNull)
+  cards Flashcard[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Flashcard {
+  id           String        @id @default(uuid())
+  deckId       String
+  front        String        @db.VarChar(1000)
+  back         String        @db.VarChar(1000)
+  repetition   Int           @default(0)
+  interval     Int           @default(1)
+  easeFactor   Float         @default(2.5)
+  nextReviewAt DateTime      @default(now())
+  createdAt    DateTime      @default(now())
+
+  deck FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId, nextReviewAt])
+}
+
+model AiUsageLog {
+  id          String   @id @default(uuid())
+  userId      String
+  actionType  String   // "AI_QUESTION" | "AI_SUMMARIZE" | "AI_QUIZ" | "AI_FLASHCARD"
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, actionType, createdAt])
 }
 
 model StudyRoom {
@@ -92,7 +141,7 @@ model PomodoroSession {
   channelId    String
   workMinutes  Int       @default(25)
   breakMinutes Int       @default(5)
-  status       String    @default("WORK") // "WORK" | "BREAK" | "STOPPED"
+  status       String    @default("WORK")
   startedAt    DateTime  @default(now())
   endsAt       DateTime
   stoppedAt    DateTime?
