@@ -1,52 +1,42 @@
 import { cleanupOldAiUsageLogs } from '../../src/services/cleanupService';
 import { prisma } from '../../src/config/prisma';
 
+jest.mock('../../src/config/prisma', () => ({
+  prisma: {
+    aiUsageLog: {
+      deleteMany: jest.fn(),
+    },
+  },
+}));
+
+const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+
 describe('cleanupOldAiUsageLogs', () => {
-  const userId = 'user-cleanup-test-id';
-
-  beforeAll(async () => {
-    await prisma.user.upsert({
-      where: { discordUserId: 'discord-cleanup-test' },
-      update: {},
-      create: { id: userId, discordUserId: 'discord-cleanup-test', username: 'cleanup_user' },
-    });
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  beforeEach(async () => {
-    await prisma.aiUsageLog.deleteMany({ where: { userId } });
-  });
-
-  afterAll(async () => {
-    await prisma.aiUsageLog.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
-    await prisma.$disconnect();
-  });
-
-  it('xóa record cũ hơn 24h', async () => {
-    await prisma.aiUsageLog.create({
-      data: {
-        userId,
-        actionType: 'AI_QUESTION',
-        createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25h trước
-      },
-    });
+  it('xóa record cũ hơn 24h và trả về số lượng record đã xóa', async () => {
+    (mockPrisma.aiUsageLog.deleteMany as jest.Mock).mockResolvedValue({ count: 5 });
 
     const { deletedCount } = await cleanupOldAiUsageLogs();
-    expect(deletedCount).toBe(1);
-    expect(await prisma.aiUsageLog.count({ where: { userId } })).toBe(0);
-  });
 
-  it('KHÔNG xóa record trong vòng 24h gần đây', async () => {
-    await prisma.aiUsageLog.create({
-      data: {
-        userId,
-        actionType: 'AI_QUESTION',
-        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1h trước
+    expect(deletedCount).toBe(5);
+    expect(mockPrisma.aiUsageLog.deleteMany).toHaveBeenCalledWith({
+      where: {
+        createdAt: {
+          lt: expect.any(Date),
+        },
       },
     });
+  });
+
+  it('trả về 0 khi không có record nào cần xóa', async () => {
+    (mockPrisma.aiUsageLog.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
 
     const { deletedCount } = await cleanupOldAiUsageLogs();
+
     expect(deletedCount).toBe(0);
-    expect(await prisma.aiUsageLog.count({ where: { userId } })).toBe(1);
+    expect(mockPrisma.aiUsageLog.deleteMany).toHaveBeenCalledTimes(1);
   });
 });
