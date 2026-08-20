@@ -32,12 +32,31 @@ export class PomodoroStateMachine {
 
 export const activeTimers = new Map<string, NodeJS.Timeout>();
 
-export async function safeRenameChannel(channel: VoiceChannel, newName: string): Promise<boolean> {
+/**
+ * Đặt hoặc xóa ghi chú trạng thái (Voice Channel Status) cho kênh thoại mà không làm đổi tên kênh gốc.
+ * @param channel Kênh voice của Discord
+ * @param status Chuỗi trạng thái hiển thị (để null hoặc rỗng "" để xóa trạng thái)
+ */
+export async function safeSetVoiceStatus(channel: VoiceChannel, status: string | null): Promise<boolean> {
   try {
-    await channel.setName(newName);
-    return true;
+    const voiceChan = channel as any;
+    if (typeof voiceChan.setStatus === 'function') {
+      await voiceChan.setStatus(status ?? '');
+      return true;
+    }
+    if (typeof voiceChan.sendVoiceStatus === 'function') {
+      await voiceChan.sendVoiceStatus(status ?? '');
+      return true;
+    }
+    if (channel.client?.rest) {
+      await channel.client.rest.put(`/channels/${channel.id}/voice-status` as any, {
+        body: { status: status ?? '' },
+      });
+      return true;
+    }
+    return false;
   } catch (error) {
-    logger.warn('Rate limited when renaming voice channel', { channelId: channel.id, error: String(error) });
+    logger.warn('Failed to update voice channel status', { channelId: channel.id, status, error: String(error) });
     return false;
   }
 }
