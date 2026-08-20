@@ -6,6 +6,7 @@ import { logger } from './utils/logger';
 import { registerHealthClient, startHealthServer, closeHealthServer } from './utils/healthServer';
 import { cleanupOldAiUsageLogs } from './services/cleanupService';
 import { sendWeeklyDigestToAllUsers } from './services/weeklyDigestService';
+import { sendDailyFlashcardReminder } from './services/dailyReminderService';
 import * as interactionCreate from './events/interactionCreate';
 import * as voiceStateUpdate from './events/voiceStateUpdate';
 
@@ -25,6 +26,7 @@ export const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMembers, // 🛡️ Cần thiết để lấy danh sách thành viên cho /leaderboard
   ],
 });
 
@@ -59,6 +61,19 @@ client.once(Events.ClientReady, async (readyClient) => {
         await sendWeeklyDigestToAllUsers(client);
       } catch (err) {
         logger.error('[Cron] Lỗi khi gửi Weekly Digest:', { error: String(err) });
+      }
+    },
+    { timezone: 'Asia/Ho_Chi_Minh' }
+  );
+
+  // 4. Cron Job 3: Gửi Daily Flashcard Reminder lúc 07:00 sáng VN hằng ngày
+  cron.schedule(
+    '0 7 * * *',
+    async () => {
+      try {
+        await sendDailyFlashcardReminder(client);
+      } catch (err) {
+        logger.error('[Cron] Lỗi khi gửi Daily Flashcard Reminder:', { error: String(err) });
       }
     },
     { timezone: 'Asia/Ho_Chi_Minh' }

@@ -66,6 +66,17 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((sub) =>
     sub.setName('list').setDescription('Xem danh sách tất cả các bộ thẻ và số thẻ cần ôn tập hôm nay')
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('share')
+      .setDescription('Chia sẻ một bộ thẻ ghi nhớ cho bạn bè trong server')
+      .addStringOption((opt) =>
+        opt.setName('ten_bo_the').setDescription('Tên bộ thẻ muốn chia sẻ').setRequired(true)
+      )
+      .addUserOption((opt) =>
+        opt.setName('nguoi_nhan').setDescription('Người bạn muốn chia sẻ bộ thẻ này').setRequired(true)
+      )
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -418,6 +429,116 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     } catch (error) {
       logger.error('Error in flashcard review', { userId: user.id, error: String(error) });
       await interaction.editReply({ content: '❌ Có lỗi xảy ra trong phiên ôn tập.' });
+      return;
+    }
+  }
+
+  // 6. CHIA SẺ BỘ THẺ
+  if (subcommand === 'share') {
+    const deckName = interaction.options.getString('ten_bo_the', true).trim();
+    const recipientUser = interaction.options.getUser('nguoi_nhan', true);
+
+    if (recipientUser.bot) {
+      await interaction.reply({ content: '❌ Bạn không thể chia sẻ bộ thẻ cho Bot.', ephemeral: true });
+      return;
+    }
+
+    if (recipientUser.id === interaction.user.id) {
+      await interaction.reply({ content: '❌ Bạn không thể tự chia sẻ bộ thẻ cho chính mình.', ephemeral: true });
+      return;
+    }
+
+    await interaction.deferReply();
+
+    try {
+      // 1. Tìm bộ thẻ nguồn
+      const sourceDeck = await prisma.flashcardDeck.findUnique({
+        where: { userId_name: { userId: user.id, name: deckName } },
+        include: { cards: true },
+      });
+
+      if (!sourceDeck) {
+        await interaction.editReply({ content: `❌ Bạn không có bộ thẻ nào tên là **"${deckName}"**.` });
+        return;
+      }
+
+      if (sourceDeck.cards.length === 0) {
+        await interaction.editReply({ content: `⚠️ Bộ thẻ **"${deckName}"** đang trống, không có thẻ nào để chia sẻ.` });
+        return;
+      }
+
+      // 2. Đảm bảo người nhận có trong CSDL
+      const targetUser = await prisma.user.upsert({
+        where: { discordUserId: recipientUser.id },
+        create: { discordUserId: recipientUser.id, username: recipientUser.username },
+        update: { username: recipientUser.username },
+      });
+
+      // 3. Đặt tên bộ thẻ cho người nhận
+      let targetDeckName = `${deckName} (từ ${interaction.user.username})`;
+      if (targetDeckName.length > 100) {
+        targetDeckName = targetDeckName.slice(0, 100);
+      }
+
+      // 4. Interactive transaction: Clone Deck + Bulk Create Cards với SM-2 reset
+      await prisma.$transaction(async (tx) => {
+        const existingTargetDeck = await tx.flashcardDeck.findUnique({
+          where: { userId_name: { userId: targetUser.id, name: targetDeckName } },
+        });
+
+        let finalDeckId: string;
+        if (existingTargetDeck) {
+          finalDeckId = existingTargetDeck.id;
+        } else {
+          const newDeck = await tx.flashcardDeck.create({
+            data: {
+              userId: targetUser.id,
+              guildId: interaction.guildId || null,
+              name: targetDeckName,
+              description: sourceDeck.description
+                ? `${sourceDeck.description} (Chia sẻ bởi @${interaction.user.username})`
+                : `Chia sẻ bởi @${interaction.user.username}`,
+            },
+          });
+          finalDeckId = newDeck.id;
+        }
+
+        const cardsToCreate = sourceDeck.cards.map((c) => ({
+          deckId: finalDeckId,
+          front: c.front,
+          back: c.back,
+          repetition: 0,
+          interval: 1,
+          easeFactor: 2.5,
+          nextReviewAt: new Date(),
+        }));
+
+        await tx.flashcard.createMany({
+          data: cardsToCreate,
+        });
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎁 Chia Sẻ Bộ Thẻ Thành Công!')
+        .setDescription(
+          `Bạn đã chia sẻ thành công bộ thẻ **"${deckName}"** (${sourceDeck.cards.length} thẻ) cho <@${recipientUser.id}>!\n\n` +
+            `📁 **Tên bộ thẻ người nhận:** \`${targetDeckName}\`\n` +
+            `🔄 **Trạng thái ôn tập:** Đã reset về chu kỳ ban đầu (SM-2: 0 ngày) để người nhận tự ôn tập.`
+        )
+        .setColor(0x57f287)
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    } catch (error: any) {
+      logger.error('Error in flashcard share', { userId: user.id, error: String(error) });
+      if (error?.code === 'P2002') {
+        await interaction.editReply({
+          content: '⚠️ Người nhận đã có một bộ thẻ tên tương tự. Vui lòng thử lại sau.',
+        });
+        return;
+      }
+      await interaction.editReply({ content: '❌ Có lỗi xảy ra khi chia sẻ bộ thẻ.' });
       return;
     }
   }

@@ -4,12 +4,47 @@ import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
-  .setDescription('Xem hồ sơ cá nhân: Chuỗi Streak, Thống kê Quiz, Giờ Pomodoro và Flashcard');
+  .setDescription('Xem hồ sơ cá nhân: Chuỗi Streak, Thống kê Quiz, Giờ Pomodoro và Flashcard')
+  .addStringOption((opt) =>
+    opt
+      .setName('nhac_nho')
+      .setDescription('Bật hoặc tắt nhắc nhở ôn tập Flashcard lúc 07:00 sáng')
+      .setRequired(false)
+      .addChoices(
+        { name: '🔔 Bật nhắc nhở (07:00 AM)', value: 'on' },
+        { name: '🔕 Tắt nhắc nhở', value: 'off' }
+      )
+  );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
+  const reminderOption = interaction.options.getString('nhac_nho');
 
   try {
+    // Nếu người dùng chọn đổi cấu hình nhắc nhở
+    if (reminderOption) {
+      const isEnabled = reminderOption === 'on';
+      await prisma.user.upsert({
+        where: { discordUserId },
+        create: {
+          discordUserId,
+          username: interaction.user.username,
+          dailyReminderEnabled: isEnabled,
+        },
+        update: {
+          username: interaction.user.username,
+          dailyReminderEnabled: isEnabled,
+        },
+      });
+
+      const statusMsg = isEnabled
+        ? '🔔 Đã **BẬT** tính năng nhắc nhở ôn tập Flashcard lúc 07:00 sáng hàng ngày.'
+        : '🔕 Đã **TẮT** tính năng nhắc nhở ôn tập Flashcard hàng ngày.';
+
+      await interaction.reply({ content: `✅ ${statusMsg}`, ephemeral: true });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { discordUserId },
       include: {
@@ -60,41 +95,57 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       dueCards += deck.cards.filter((c) => c.nextReviewAt <= now).length;
     }
 
-    // 4. Xếp hạng danh hiệu
+    // 4. Danh hiệu theo chuỗi Streak
     let titleBadge = '🌱 Tân Binh Chăm Chỉ';
-    if (user.streakCount >= 30) titleBadge = '👑 Đại Kiện Tướng Học Tập';
-    else if (user.streakCount >= 14) titleBadge = '⚡ Bậc Thầy Kỷ Luật';
-    else if (user.streakCount >= 7) titleBadge = '🔥 Chiến Thần Học Tập';
-    else if (user.streakCount >= 3) titleBadge = '⭐ Ngôi Sao Triển Vọng';
+    if (user.streakCount >= 30) {
+      titleBadge = '👑 Đại Kiện Tướng Học Tập';
+    } else if (user.streakCount >= 14) {
+      titleBadge = '⚡ Chiến Binh Kỷ Luật';
+    } else if (user.streakCount >= 7) {
+      titleBadge = '🔥 Ngọn Lửa Bền Bỉ';
+    } else if (user.streakCount >= 3) {
+      titleBadge = '⭐ Ngôi Sao Tri Thức';
+    }
+
+    const reminderStatus = user.dailyReminderEnabled ? '🔔 Đang bật (07:00 AM)' : '🔕 Đang tắt';
 
     const embed = new EmbedBuilder()
-      .setTitle(`🎓 Hồ Sơ Học Tập: ${interaction.user.username}`)
-      .setThumbnail(interaction.user.displayAvatarURL())
-      .setColor(0x57f287)
-      .setDescription(`**Danh hiệu:** ${titleBadge}\n**Chuỗi học liên tiếp (Streak):** 🔥 **${user.streakCount} ngày**`)
+      .setTitle(`🎓 Hồ Sơ Học Tập: ${user.username}`)
+      .setDescription(`Danh hiệu hiện tại: **${titleBadge}**`)
+      .setColor(0x5865f2)
       .addFields(
         {
-          name: '📝 Trắc Nghiệm AI (/quiz)',
-          value: `• Tổng bài làm: **${totalQuizzes} bài**\n• Tổng câu hỏi: **${totalQuestions} câu**\n• Độ chính xác: **${quizAccuracy}%** (${totalCorrect}/${totalQuestions})`,
+          name: '🔥 Chuỗi Ngày Học (Streak)',
+          value: `**${user.streakCount} ngày liên tiếp**`,
           inline: true,
         },
         {
-          name: '🍅 Tập Trung (/pomodoro)',
-          value: `• Tổng số phiên: **${user.pomodoroSessions.length} phiên**\n• Thời gian học: **${pomoHours} giờ** (${totalWorkMinutes} phút)`,
+          name: '🍅 Thời Gian Pomodoro',
+          value: `**${pomoHours} giờ** (${user.pomodoroSessions.length} phiên)`,
           inline: true,
         },
         {
-          name: '🗂️ Thẻ Nhớ SM-2 (/flashcard)',
-          value: `• Bộ thẻ sở hữu: **${totalDecks} bộ**\n• Tổng số thẻ: **${totalCards} thẻ**\n• Thẻ cần ôn hôm nay: ⏰ **${dueCards} thẻ**`,
+          name: '📝 Bài Làm Quiz',
+          value: `**${totalQuizzes} bài** (Độ chính xác: **${quizAccuracy}%**)`,
+          inline: true,
+        },
+        {
+          name: '🗂️ Thẻ Nhớ Flashcard (SM-2)',
+          value: `📚 **${totalDecks} bộ thẻ** (${totalCards} thẻ)\n⏰ **${dueCards} thẻ** cần ôn hôm nay`,
+          inline: false,
+        },
+        {
+          name: '⚙️ Cài Đặt Nhắc Nhở',
+          value: `${reminderStatus} *(Dùng \`/profile nhac_nho: on/off\` để đổi)*`,
           inline: false,
         }
       )
-      .setFooter({ text: 'Study Buddy 2.0 • Học tập thông minh mỗi ngày' })
+      .setFooter({ text: 'Study Buddy Ecosystem • Giữ vững tinh thần học tập mỗi ngày!' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+    await interaction.reply({ embeds: [embed] });
   } catch (error) {
-    logger.error('Error executing /profile', { discordUserId, error: String(error) });
-    await interaction.reply({ content: '❌ Có lỗi xảy ra khi tải hồ sơ cá nhân.', ephemeral: true });
+    logger.error('Error executing profile command', { discordUserId, error: String(error) });
+    await interaction.reply({ content: '❌ Có lỗi xảy ra khi tải hồ sơ học tập.', ephemeral: true });
   }
 }

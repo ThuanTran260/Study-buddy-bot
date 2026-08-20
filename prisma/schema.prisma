@@ -30,10 +30,11 @@ model User {
   id             String    @id @default(uuid())
   discordUserId  String    @unique
   username       String
-  streakCount    Int       @default(0)
-  lastActiveDate DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  streakCount          Int       @default(0)
+  lastActiveDate       DateTime?
+  dailyReminderEnabled Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   quizSessions     QuizSession[]
   studyRooms       StudyRoom[]

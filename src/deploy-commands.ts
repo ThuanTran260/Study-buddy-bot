@@ -9,6 +9,7 @@ import { data as configData } from './commands/config';
 import { data as profileData } from './commands/profile';
 import { data as digestData } from './commands/digest';
 import { data as flashcardData } from './commands/flashcard';
+import { data as leaderboardData } from './commands/leaderboard';
 
 const commands = [
   hoiData.toJSON(),
@@ -20,6 +21,7 @@ const commands = [
   profileData.toJSON(),
   digestData.toJSON(),
   flashcardData.toJSON(),
+  leaderboardData.toJSON(),
 ];
 
 const rest = new REST().setToken(env.discordToken);
@@ -29,11 +31,11 @@ const rest = new REST().setToken(env.discordToken);
     if (env.guildId) {
       console.log(`🚀 Đang đăng ký ${commands.length} Slash Commands cho Guild ID: ${env.guildId}...`);
       await rest.put(Routes.applicationGuildCommands(env.clientId, env.guildId), { body: commands });
-      console.log('✅ Đã đăng ký thành công toàn bộ 9 Slash Commands vào Server của bạn!');
+      console.log(`✅ Đã đăng ký thành công toàn bộ ${commands.length} Slash Commands vào Server của bạn!`);
     } else {
       console.log(`🌍 Đang đăng ký ${commands.length} Global Slash Commands...`);
       await rest.put(Routes.applicationCommands(env.clientId), { body: commands });
-      console.log('✅ Đã đăng ký Global Commands thành công!');
+      console.log(`✅ Đã đăng ký thành công ${commands.length} Global Commands!`);
     }
   } catch (error: any) {
     if (error.code === 50001) {

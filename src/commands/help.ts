@@ -24,6 +24,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           '• `/flashcard add <ten_bo_the> <mat_truoc> <mat_sau>` — Thêm thẻ thủ công\n' +
           '• `/flashcard ai-generate <ten_bo_the> <chu_de> [so_the]` — Dùng AI sinh bộ thẻ tự động\n' +
           '• `/flashcard review [ten_bo_the]` — Ôn tập thẻ theo thuật toán SuperMemo-2 (Anki)\n' +
+          '• `/flashcard share <ten_bo_the> <@user>` — Chia sẻ bộ thẻ cho bạn bè trong server\n' +
           '• `/flashcard list` — Xem danh sách các bộ thẻ và số lượng thẻ đến hạn ôn',
       },
       {
@@ -34,9 +35,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           '• **Auto Study Room** — Tham gia kênh trigger tạo phòng để tự động mở phòng học riêng',
       },
       {
-        name: '📊 Cá Nhân & Thống Kê Tiến Độ',
+        name: '📊 Cá Nhân & Xếp Hạng Cộng Đồng',
         value:
-          '• `/profile` — Xem hồ sơ cá nhân: Chuỗi Streak 🔥, Tỷ lệ đúng %, Giờ Pomodoro 🍅\n' +
+          '• `/leaderboard <loai>` — Xem bảng xếp hạng top 10 thành viên server (Streak / Quiz / Pomodoro / Flashcard)\n' +
+          '• `/profile [nhac_nho]` — Xem hồ sơ cá nhân: Chuỗi Streak 🔥, Giờ Pomodoro 🍅, Đổi cài đặt nhắc nhở 07:00 AM\n' +
           '• `/digest` — Xem bản tổng kết học tập 7 ngày qua của bạn',
       },
       {
