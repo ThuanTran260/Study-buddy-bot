@@ -10,7 +10,8 @@ const rawEnvSchema = z.object({
   AI_PROVIDER: z.enum(['openai', 'anthropic', 'gemini']).default('openai'),
   AI_API_KEY: z.string().min(1, 'AI_API_KEY is required'),
   AI_MODEL: z.string().default('gpt-4o-mini'),
-  HEALTH_PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().optional(),
+  HEALTH_PORT: z.coerce.number().optional(),
 });
 
 export const envSchema = rawEnvSchema.transform((data) => ({
@@ -22,7 +23,7 @@ export const envSchema = rawEnvSchema.transform((data) => ({
   aiProvider: data.AI_PROVIDER,
   aiApiKey: data.AI_API_KEY,
   aiModel: data.AI_MODEL,
-  healthPort: data.HEALTH_PORT,
+  healthPort: data.PORT || data.HEALTH_PORT || 3000,
 }));
 
 export type Env = z.infer<typeof envSchema>;

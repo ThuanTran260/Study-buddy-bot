@@ -1,0 +1,84 @@
+name: CI/CD Pipeline - Test & Deploy to Render
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # =========================================================================
+  # 🧪 JOB 1: CONTINUOUS INTEGRATION (CI) — Kiểm thử & Thẩm định chất lượng
+  # =========================================================================
+  test_and_validate:
+    name: 🧪 Run Tests, Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🗄️ Generate Prisma Client
+        run: npx prisma generate
+
+      - name: 🔍 TypeScript Strict Typecheck
+        run: npx tsc --noEmit
+
+      - name: 🧪 Run Full Test Suite (19 Suites / 100 Tests)
+        run: npm test -- --coverage
+        env:
+          NODE_ENV: test
+          DISCORD_TOKEN: mock_token_for_ci
+          CLIENT_ID: mock_client_id_for_ci
+          DATABASE_URL: postgresql://mock:mock@localhost:5432/mock
+          AI_API_KEY: mock_ai_key_for_ci
+          AI_PROVIDER: openai
+          AI_MODEL: gpt-4o-mini
+
+      - name: 🏗️ Verify Production Build
+        run: npm run build
+
+  # =========================================================================
+  # 🚀 JOB 2: CONTINUOUS DEPLOYMENT (CD) — Tự động kích hoạt deploy lên Render
+  # =========================================================================
+  deploy_to_render:
+    name: 🚀 Trigger Render Auto-Deploy
+    needs: test_and_validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🌐 Trigger Render Deploy Hook
+        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        run: |
+          echo "Triggering Render deployment webhook..."
+          curl -X POST -f "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" || echo "⚠️ Deploy hook returned status or not configured, Render Git sync will handle auto-deploy."
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+
+      - name: 🤖 Auto Deploy Slash Commands to Discord (Optional)
+        if: env.DISCORD_TOKEN != '' && env.CLIENT_ID != ''
+        run: |
+          npm ci
+          npx prisma generate
+          npx ts-node src/deploy-commands.ts
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          GUILD_ID: ${{ secrets.GUILD_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}

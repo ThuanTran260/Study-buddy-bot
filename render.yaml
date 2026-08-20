@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: study-buddy-discord-bot
+    runtime: node
+    plan: free
+    region: singapore # Chọn khu vực gần Việt Nam nhất để giảm latency
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: CLIENT_ID
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: AI_PROVIDER
+        value: gemini
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: gemini-3.5-flash
+      - key: PORT
+        value: 10000

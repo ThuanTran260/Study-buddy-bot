@@ -4,7 +4,8 @@
   "description": "Study Buddy Discord Bot",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "deploy:commands": "ts-node src/deploy-commands.ts",

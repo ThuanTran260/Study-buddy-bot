@@ -17,8 +17,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
+ENV NODE_ENV=production
+EXPOSE 3000 10000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -f http://localhost:${PORT:-3000}/health || exit 1
 
 CMD ["node", "dist/index.js"]
