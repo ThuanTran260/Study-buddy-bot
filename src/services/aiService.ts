@@ -317,7 +317,7 @@ export async function generateStudyPackJson(documentContent: string): Promise<st
   ]
 }`,
     userMessage: `Phân tích tài liệu học tập sau và tạo trọn bộ Study Pack (3-5 flashcards, 2-3 câu hỏi trắc nghiệm):\n\n${documentContent}`,
-    maxTokens: 2500,
+    maxTokens: 4096,
     jsonMode: true,
   });
 }
@@ -329,27 +329,57 @@ export function parseStudyPackResponse(raw: string): StudyPackData | null {
 
     if (!parsed) return null;
 
-    // 1. Chuẩn hóa summary
-    let summary = '';
-    if (typeof parsed.summary === 'string') {
-      summary = parsed.summary.trim();
-    } else if (Array.isArray(parsed.summary)) {
-      summary = parsed.summary.join('\n').trim();
+    // 🛡️ 1. Mở bọc (Unwrap) nếu AI gói đối tượng trong mảng hoặc key cha (studyPack, data, result)
+    let root = parsed;
+    if (Array.isArray(root) && root.length > 0 && typeof root[0] === 'object') {
+      root = root[0];
+    }
+    if (root.studyPack && typeof root.studyPack === 'object') {
+      root = root.studyPack;
+    } else if (root.data && typeof root.data === 'object') {
+      root = root.data;
+    } else if (root.result && typeof root.result === 'object') {
+      root = root.result;
     }
 
-    if (!summary) return null;
+    // 🛡️ 2. Chuẩn hóa Summary (hỗ trợ nhiều tên biến và mảng chuỗi)
+    const rawSummary =
+      root.summary ||
+      root.overview ||
+      root.mainPoints ||
+      root.tomTat ||
+      root.points ||
+      root.content ||
+      root.description;
 
-    // 2. Chuẩn hóa flashcards
-    const rawCards = Array.isArray(parsed.flashcards)
-      ? parsed.flashcards
-      : Array.isArray(parsed.cards)
-      ? parsed.cards
+    let summary = '';
+    if (typeof rawSummary === 'string') {
+      summary = rawSummary.trim();
+    } else if (Array.isArray(rawSummary)) {
+      summary = rawSummary
+        .map((s: any) => (typeof s === 'string' ? s : JSON.stringify(s)))
+        .join('\n')
+        .trim();
+    }
+
+    // 🛡️ 3. Chuẩn hóa Flashcards (hỗ trợ cards, deck, vocabulary, term/definition, question/answer)
+    const rawCards = Array.isArray(root.flashcards)
+      ? root.flashcards
+      : Array.isArray(root.cards)
+      ? root.cards
+      : Array.isArray(root.flashcard)
+      ? root.flashcard
+      : Array.isArray(root.items)
+      ? root.items
+      : Array.isArray(root.vocabulary)
+      ? root.vocabulary
       : [];
 
     const flashcards: FlashcardItemData[] = [];
     for (const c of rawCards) {
-      const front = (c.front || c.term || c.question || '').toString().trim();
-      const back = (c.back || c.definition || c.answer || '').toString().trim();
+      if (!c || typeof c !== 'object') continue;
+      const front = (c.front || c.term || c.question || c.concept || c.key || '').toString().trim();
+      const back = (c.back || c.definition || c.answer || c.meaning || c.explanation || c.value || '').toString().trim();
       if (front && back) {
         flashcards.push({
           front: front.slice(0, 1000),
@@ -358,51 +388,82 @@ export function parseStudyPackResponse(raw: string): StudyPackData | null {
       }
     }
 
-    // 3. Chuẩn hóa quiz
-    const rawQuiz = Array.isArray(parsed.quiz)
-      ? parsed.quiz
-      : Array.isArray(parsed.questions)
-      ? parsed.questions
+    // 🛡️ 4. Chuẩn hóa Quiz (hỗ trợ questions, test, quizzes, 2-4 options, object options, string options)
+    const rawQuiz = Array.isArray(root.quiz)
+      ? root.quiz
+      : Array.isArray(root.questions)
+      ? root.questions
+      : Array.isArray(root.test)
+      ? root.test
+      : Array.isArray(root.quizzes)
+      ? root.quizzes
       : [];
 
     const quiz: QuizQuestionData[] = [];
+    const labels = ['A', 'B', 'C', 'D'];
+
     for (const q of rawQuiz) {
-      if (!q || typeof q.question !== 'string') continue;
+      if (!q || typeof q !== 'object') continue;
+      const questionText = (q.question || q.cauHoi || q.prompt || '').toString().trim();
+      if (!questionText) continue;
 
       let options: { label: string; text: string }[] = [];
+
       if (Array.isArray(q.options)) {
-        if (q.options.length === 4 && typeof q.options[0] === 'object' && q.options[0]?.label) {
-          options = q.options.map((o: any) => ({
-            label: o.label.toString().toUpperCase().trim(),
-            text: o.text.toString().trim(),
+        if (q.options.length >= 2 && typeof q.options[0] === 'object' && q.options[0] !== null) {
+          options = q.options.map((o: any, idx: number) => ({
+            label: (o.label || labels[idx] || 'A').toString().toUpperCase().trim().charAt(0),
+            text: (o.text || o.content || o.value || '').toString().trim(),
           }));
-        } else if (q.options.length === 4 && typeof q.options[0] === 'string') {
-          const labels = ['A', 'B', 'C', 'D'];
+        } else if (q.options.length >= 2 && typeof q.options[0] === 'string') {
           options = q.options.map((optText: string, idx: number) => ({
-            label: labels[idx],
+            label: labels[idx] || 'A',
             text: optText.replace(/^[A-D][\.\:\)\-]\s*/i, '').trim(),
           }));
         }
       } else if (typeof q.options === 'object' && q.options !== null) {
-        const labels = ['A', 'B', 'C', 'D'];
-        for (const l of labels) {
-          if (q.options[l] || q.options[l.toLowerCase()]) {
+        for (let i = 0; i < labels.length; i++) {
+          const l = labels[i];
+          const val = q.options[l] || q.options[l.toLowerCase()];
+          if (val) {
             options.push({
               label: l,
-              text: (q.options[l] || q.options[l.toLowerCase()]).toString().trim(),
+              text: val.toString().trim(),
             });
           }
         }
       }
 
-      const rawCorrect = (q.correctOption || q.answer || 'A').toString().trim().toUpperCase();
-      const firstChar = rawCorrect.charAt(0);
-      const correctOption = VALID_OPTIONS.has(firstChar) ? (firstChar as 'A' | 'B' | 'C' | 'D') : 'A';
-      const explanation = (q.explanation || q.reason || 'Đáp án đúng theo bài học.').toString().trim();
+      // Nếu có 2 hoặc 3 options (ví dụ câu hỏi Đúng/Sai), tự động bổ sung thành 4 options chuẩn Discord
+      while (options.length > 0 && options.length < 4) {
+        const nextLabel = labels[options.length];
+        options.push({
+          label: nextLabel,
+          text: options.length === 2 ? 'Không có đáp án phù hợp' : 'Cả hai phương án trên đều sai',
+        });
+      }
+
+      // Xác định correctOption
+      let correctOption: 'A' | 'B' | 'C' | 'D' = 'A';
+      const rawCorrect = (q.correctOption || q.answer || q.correct || q.dapAn || 'A').toString().trim();
+
+      const firstChar = rawCorrect.toUpperCase().charAt(0);
+      if (VALID_OPTIONS.has(firstChar)) {
+        correctOption = firstChar as 'A' | 'B' | 'C' | 'D';
+      } else {
+        const matchedIndex = options.findIndex(
+          (o) => o.text.toLowerCase() === rawCorrect.toLowerCase() || rawCorrect.toLowerCase().includes(o.text.toLowerCase())
+        );
+        if (matchedIndex !== -1 && labels[matchedIndex]) {
+          correctOption = labels[matchedIndex] as 'A' | 'B' | 'C' | 'D';
+        }
+      }
+
+      const explanation = (q.explanation || q.reason || q.giaiThich || 'Đáp án chính xác theo tài liệu bài học.').toString().trim();
 
       if (options.length === 4) {
         quiz.push({
-          question: q.question.trim(),
+          question: questionText,
           options,
           correctOption,
           explanation,
@@ -410,7 +471,23 @@ export function parseStudyPackResponse(raw: string): StudyPackData | null {
       }
     }
 
-    if (flashcards.length === 0 || quiz.length === 0) {
+    // Nếu summary bị thiếu, tự sinh tóm tắt từ flashcards
+    if (!summary && flashcards.length > 0) {
+      summary = flashcards.map((f) => `• **${f.front}**: ${f.back}`).join('\n');
+    }
+
+    // Nếu flashcards bị thiếu nhưng có quiz, tự sinh flashcard từ quiz
+    if (flashcards.length === 0 && quiz.length > 0) {
+      for (const q of quiz) {
+        const correctText = q.options.find((o) => o.label === q.correctOption)?.text || q.explanation;
+        flashcards.push({
+          front: q.question,
+          back: correctText,
+        });
+      }
+    }
+
+    if (!summary || (flashcards.length === 0 && quiz.length === 0)) {
       return null;
     }
 

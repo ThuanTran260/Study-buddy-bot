@@ -57,11 +57,11 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       expect(parsed?.quiz[0].correctOption).toBe('B');
     });
 
-    it('Case 1.4: Handles alternative field names (term/definition, answer/reason)', () => {
+    it('Case 1.4: Handles alternative field names (term/definition, answer/reason, overview/cards/questions)', () => {
       const aliasJson = `{
-        "summary": "Tóm tắt",
-        "flashcards": [{"term": "Thuật ngữ X", "definition": "Định nghĩa X"}],
-        "quiz": [{
+        "overview": "Tóm tắt bài giảng bảo mật",
+        "cards": [{"term": "Thuật ngữ X", "definition": "Định nghĩa X"}],
+        "questions": [{
           "question": "Câu hỏi?",
           "options": [{"label": "A", "text": "1"}, {"label": "B", "text": "2"}, {"label": "C", "text": "3"}, {"label": "D", "text": "4"}],
           "answer": "C",
@@ -70,12 +70,39 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       }`;
       const parsed = parseStudyPackResponse(aliasJson);
       expect(parsed).not.toBeNull();
+      expect(parsed?.summary).toBe('Tóm tắt bài giảng bảo mật');
       expect(parsed?.flashcards[0].front).toBe('Thuật ngữ X');
       expect(parsed?.quiz[0].correctOption).toBe('C');
       expect(parsed?.quiz[0].explanation).toBe('Giải thích');
     });
 
-    it('Case 1.5: Safely rejects completely unrecoverable corrupt JSON without throwing', () => {
+    it('Case 1.5: Handles wrapped objects { studyPack: { ... } } or arrays [ { ... } ]', () => {
+      const wrappedJson = JSON.stringify({
+        studyPack: {
+          summary: "• Luận điểm A",
+          flashcards: [{ front: "F", back: "B" }],
+          quiz: [{ question: "Q?", options: ["A. 1", "B. 2", "C. 3", "D. 4"], correctOption: "A", explanation: "E" }]
+        }
+      });
+      const parsed = parseStudyPackResponse(wrappedJson);
+      expect(parsed).not.toBeNull();
+      expect(parsed?.summary).toContain('Luận điểm A');
+      expect(parsed?.flashcards.length).toBe(1);
+    });
+
+    it('Case 1.6: Auto-pads 2-option (True/False) questions to 4 options for Discord buttons', () => {
+      const tfJson = JSON.stringify({
+        summary: "• Tóm tắt",
+        flashcards: [{ front: "F", back: "B" }],
+        quiz: [{ question: "Server Components chạy trên Server?", options: ["A. Đúng", "B. Sai"], correctOption: "A", explanation: "Đúng" }]
+      });
+      const parsed = parseStudyPackResponse(tfJson);
+      expect(parsed).not.toBeNull();
+      expect(parsed?.quiz[0].options.length).toBe(4);
+      expect(parsed?.quiz[0].correctOption).toBe('A');
+    });
+
+    it('Case 1.7: Safely rejects completely unrecoverable corrupt JSON without throwing', () => {
       const corruptData = 'Xin lỗi, tôi không thể xử lý tài liệu này.';
       expect(parseStudyPackResponse(corruptData)).toBeNull();
       expect(parseAIJsonResponse(corruptData)).toBeNull();

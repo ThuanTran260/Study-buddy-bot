@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
 
 const MAX_DOCUMENT_CHARS = 12_000;
 const ALLOWED_EXTENSIONS = ['.txt', '.md', '.json', '.csv'];
-const FETCH_TIMEOUT_MS = 5_000;
+const FETCH_TIMEOUT_MS = 10_000;
 
 export interface ExtractedDocumentResult {
   text: string;
