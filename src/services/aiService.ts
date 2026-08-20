@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { env } from '../config/env';
 import { sanitizeDiscordOutput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
+import { ConversationMessage } from './conversationMemory';
 
 const BASE_SYSTEM_PROMPT = `Bạn là Study Buddy — trợ lý học tập thông minh cho sinh viên.
 Quy tắc bắt buộc:
@@ -19,11 +20,13 @@ const geminiClient = env.aiApiKey ? new GoogleGenAI({ apiKey: env.aiApiKey }) : 
 async function callAI({
   systemPrompt,
   userMessage,
+  history = [],
   maxTokens = 800,
   jsonMode = false,
 }: {
   systemPrompt: string;
   userMessage: string;
+  history?: ConversationMessage[];
   maxTokens?: number;
   jsonMode?: boolean;
 }): Promise<string> {
@@ -34,10 +37,23 @@ async function callAI({
     let answer = '';
 
     if (env.aiProvider === 'gemini' && geminiClient) {
-      // Gọi Google Gemini API (Miễn phí)
+      // 🧠 Multi-turn format cho Google Gemini
+      let contents: any;
+      if (history.length > 0) {
+        contents = [
+          ...history.map((m) => ({
+            role: m.role,
+            parts: [{ text: m.content }],
+          })),
+          { role: 'user', parts: [{ text: userMessage }] },
+        ];
+      } else {
+        contents = userMessage;
+      }
+
       const response = await geminiClient.models.generateContent({
         model: env.aiModel || 'gemini-3.5-flash',
-        contents: userMessage,
+        contents,
         config: {
           systemInstruction: systemPrompt,
           maxOutputTokens: Math.max(maxTokens, 2048),
@@ -46,14 +62,20 @@ async function callAI({
       });
       answer = response.text || '';
     } else if (openaiClient) {
-      // Gọi OpenAI API
+      // 🧠 Multi-turn format cho OpenAI
+      const messages: any[] = [{ role: 'system', content: systemPrompt }];
+      for (const h of history) {
+        messages.push({
+          role: h.role === 'model' ? 'assistant' : 'user',
+          content: h.content,
+        });
+      }
+      messages.push({ role: 'user', content: userMessage });
+
       const response = await openaiClient.chat.completions.create(
         {
           model: env.aiModel || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage },
-          ],
+          messages,
           max_tokens: maxTokens,
           ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
         },
@@ -81,6 +103,21 @@ export async function askAI(userQuestion: string): Promise<string> {
     systemPrompt: `${BASE_SYSTEM_PROMPT}\n4. Giữ câu trả lời ngắn gọn, súc tích, tối đa 1500 ký tự.`,
     userMessage: userQuestion,
     maxTokens: 600,
+  });
+}
+
+/**
+ * Hỏi đáp AI có ghi nhớ ngữ cảnh hội thoại
+ */
+export async function askAIWithContext(
+  userQuestion: string,
+  history: ConversationMessage[]
+): Promise<string> {
+  return callAI({
+    systemPrompt: `${BASE_SYSTEM_PROMPT}\n4. Bạn đang trò chuyện tiếp nối với sinh viên. Hãy dựa vào ngữ cảnh các tin nhắn trước để trả lời chính xác, gắn kết. Tối đa 1500 ký tự.`,
+    userMessage: userQuestion,
+    history,
+    maxTokens: 800,
   });
 }
 
@@ -168,6 +205,65 @@ export function parseFlashcardAIResponse(raw: string): FlashcardItemData[] | nul
     );
 
     return valid ? (list as FlashcardItemData[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// 📑 AI DOCUMENT STUDY PACK GENERATOR (/tailieu)
+// ----------------------------------------------------
+
+export interface StudyPackData {
+  summary: string;
+  flashcards: FlashcardItemData[];
+  quiz: QuizQuestionData[];
+}
+
+export async function generateStudyPackJson(documentContent: string): Promise<string> {
+  return callAI({
+    systemPrompt: `${BASE_SYSTEM_PROMPT}
+4. Bạn là cố vấn học tập cao cấp. Hãy phân tích kỹ tài liệu bài giảng được cung cấp và trích xuất trọn bộ tài liệu ôn tập Study Pack.
+5. Trả về JSON bắt buộc theo cấu trúc:
+{
+  "summary": "Tóm tắt 3-4 điểm chính cốt lõi nhất của tài liệu dạng gạch đầu dòng (•)",
+  "flashcards": [
+    {"front": "Thuật ngữ / Khái niệm / Câu hỏi chính (mặt trước)", "back": "Định nghĩa / Giải thích ngắn gọn (mặt sau)"}
+  ],
+  "quiz": [
+    {
+      "question": "Câu hỏi trắc nghiệm kiểm tra độ hiểu bài",
+      "options": [{"label": "A", "text": "..."}, {"label": "B", "text": "..."}, {"label": "C", "text": "..."}, {"label": "D", "text": "..."}],
+      "correctOption": "A",
+      "explanation": "Lời giải thích ngắn gọn vì sao đáp án đúng"
+    }
+  ]
+}`,
+    userMessage: `Phân tích tài liệu học tập sau và tạo trọn bộ Study Pack (3-5 flashcards, 2-3 câu hỏi trắc nghiệm):\n\n${documentContent}`,
+    maxTokens: 2500,
+    jsonMode: true,
+  });
+}
+
+export function parseStudyPackResponse(raw: string): StudyPackData | null {
+  try {
+    const cleaned = raw.replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    if (!parsed || typeof parsed.summary !== 'string') return null;
+
+    const flashcards = parseFlashcardAIResponse(JSON.stringify(parsed.flashcards));
+    const quiz = parseAIJsonResponse(JSON.stringify(parsed.quiz));
+
+    if (!flashcards || flashcards.length === 0 || !quiz || quiz.length === 0) {
+      return null;
+    }
+
+    return {
+      summary: parsed.summary,
+      flashcards,
+      quiz,
+    };
   } catch {
     return null;
   }

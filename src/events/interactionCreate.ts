@@ -11,6 +11,7 @@ import * as profileCommand from '../commands/profile';
 import * as digestCommand from '../commands/digest';
 import * as flashcardCommand from '../commands/flashcard';
 import * as leaderboardCommand from '../commands/leaderboard';
+import * as tailieuCommand from '../commands/tailieu';
 
 const commands = new Map<string, any>([
   ['hoi', hoiCommand],
@@ -23,6 +24,7 @@ const commands = new Map<string, any>([
   ['digest', digestCommand],
   ['flashcard', flashcardCommand],
   ['leaderboard', leaderboardCommand],
+  ['tailieu', tailieuCommand],
 ]);
 
 export const name = Events.InteractionCreate;

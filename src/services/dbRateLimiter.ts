@@ -1,12 +1,18 @@
 import { prisma } from '../config/prisma';
 
-export type AiActionType = 'AI_QUESTION' | 'AI_SUMMARIZE' | 'AI_QUIZ' | 'AI_FLASHCARD';
+export type AiActionType =
+  | 'AI_QUESTION'
+  | 'AI_SUMMARIZE'
+  | 'AI_QUIZ'
+  | 'AI_FLASHCARD'
+  | 'AI_DOCUMENT_STUDY';
 
 export const AI_LIMITS: Record<AiActionType, { limitPerHour: number; name: string }> = {
   AI_QUESTION: { limitPerHour: 10, name: 'Hỏi đáp AI' },
   AI_SUMMARIZE: { limitPerHour: 10, name: 'Tóm tắt AI' },
   AI_QUIZ: { limitPerHour: 5, name: 'Tạo Quiz AI' },
   AI_FLASHCARD: { limitPerHour: 5, name: 'Tạo Flashcard AI' },
+  AI_DOCUMENT_STUDY: { limitPerHour: 3, name: 'Phân tích Tài liệu AI' },
 };
 
 export async function checkDbRateLimit(

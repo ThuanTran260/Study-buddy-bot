@@ -13,8 +13,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       {
         name: '🧠 Trợ Lý AI (Trí Tuệ Nhân Tạo)',
         value:
-          '• `/hoi <cau_hoi>` — Hỏi đáp kiến thức học tập với Gemini AI\n' +
-          '• `/tomtat <noi_dung>` — Tóm tắt văn bản dài thành các điểm chính (tối đa 4000 ký tự)',
+          '• `/hoi <cau_hoi> [moi]` — Hỏi đáp kiến thức học tập có ghi nhớ ngữ cảnh (chọn `moi:true` để bắt đầu chủ đề mới)\n' +
+          '• `/tomtat <noi_dung>` — Tóm tắt văn bản dài thành các điểm chính (tối đa 4000 ký tự)\n' +
+          '• `/tailieu <ten_bo_the> [noi_dung] [file]` — Chuyển đổi bài giảng/tài liệu thành trọn bộ Study Pack (Tóm tắt + Flashcard + Quiz)',
       },
       {
         name: '🎯 Trắc Nghiệm & Ghi Nhớ Lâu Dài (Spaced Repetition)',

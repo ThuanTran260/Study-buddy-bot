@@ -10,6 +10,7 @@ import { data as profileData } from './commands/profile';
 import { data as digestData } from './commands/digest';
 import { data as flashcardData } from './commands/flashcard';
 import { data as leaderboardData } from './commands/leaderboard';
+import { data as tailieuData } from './commands/tailieu';
 
 const commands = [
   hoiData.toJSON(),
@@ -22,6 +23,7 @@ const commands = [
   digestData.toJSON(),
   flashcardData.toJSON(),
   leaderboardData.toJSON(),
+  tailieuData.toJSON(),
 ];
 
 const rest = new REST().setToken(env.discordToken);
