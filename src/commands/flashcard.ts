@@ -12,6 +12,7 @@ import { calculateSM2 } from '../services/sm2Service';
 import { generateFlashcardsJson, parseFlashcardAIResponse } from '../services/aiService';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
+import { resolveGuildId } from '../utils/guildResolver';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -108,7 +109,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await prisma.flashcardDeck.create({
         data: {
           userId: user.id,
-          guildId: interaction.guildId || null,
+          guildId: await resolveGuildId(interaction.guildId),
           name: deckName,
           description: description || null,
         },
@@ -189,7 +190,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         deck = await prisma.flashcardDeck.create({
           data: {
             userId: user.id,
-            guildId: interaction.guildId || null,
+            guildId: await resolveGuildId(interaction.guildId),
             name: deckName,
             description: `Tạo tự động bởi AI - Chủ đề: ${topic}`,
           },
@@ -493,7 +494,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           const newDeck = await tx.flashcardDeck.create({
             data: {
               userId: targetUser.id,
-              guildId: interaction.guildId || null,
+              guildId: await resolveGuildId(interaction.guildId),
               name: targetDeckName,
               description: sourceDeck.description
                 ? `${sourceDeck.description} (Chia sẻ bởi @${interaction.user.username})`

@@ -6,6 +6,7 @@ import {
 import { extractDocumentContent, processStudyPackIngestion } from '../services/documentService';
 import { checkDbRateLimit } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
+import { resolveGuildId } from '../utils/guildResolver';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -61,12 +62,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       fileAttachment?.size
     );
 
+    // 2.5. Resolve Discord Guild ID → Internal Guild UUID (FK-safe)
+    const internalGuildId = await resolveGuildId(interaction.guildId);
+
     // 3. Xử lý qua AI Pipeline và lưu CSDL
     const result = await processStudyPackIngestion(
       user.id,
       discordUserId,
       interaction.user.username,
-      interaction.guildId || null,
+      internalGuildId,
       deckName,
       extracted.text
     );
