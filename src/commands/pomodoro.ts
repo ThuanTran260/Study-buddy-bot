@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, VoiceChannel, GuildMe
 import { PomodoroStateMachine, PomodoroStatus, activeTimers, safeSetVoiceStatus } from '../services/pomodoroService';
 import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
+import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
   .setName('pomodoro')
@@ -27,17 +28,23 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const subcommand = interaction.options.getSubcommand();
 
   if (subcommand === 'stop') {
-    const timer = activeTimers.get(voiceChannel.id);
-    if (timer) {
-      clearTimeout(timer);
-      activeTimers.delete(voiceChannel.id);
+    try {
+      const timer = activeTimers.get(voiceChannel.id);
+      if (timer) {
+        clearTimeout(timer);
+        activeTimers.delete(voiceChannel.id);
+      }
+
+      // Xóa sạch ghi chú trạng thái kênh voice (non-blocking)
+      safeSetVoiceStatus(voiceChannel, '').catch(() => {});
+
+      await interaction.reply({ content: '⏹️ Đã dừng phiên Pomodoro và xóa trạng thái kênh.', ephemeral: false });
+      return;
+    } catch (error) {
+      logger.error('Error in pomodoro stop', { error: String(error) });
+      await interaction.reply({ content: '❌ Có lỗi khi dừng phiên Pomodoro.', ephemeral: true });
+      return;
     }
-
-    // Xóa sạch ghi chú trạng thái kênh voice
-    await safeSetVoiceStatus(voiceChannel, '');
-
-    await interaction.reply({ content: '⏹️ Đã dừng phiên Pomodoro và xóa trạng thái kênh.', ephemeral: false });
-    return;
   }
 
   if (subcommand === 'start') {
@@ -52,61 +59,75 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await interaction.deferReply();
 
-    const userRecord = await prisma.user.upsert({
-      where: { discordUserId: interaction.user.id },
-      create: { discordUserId: interaction.user.id, username: interaction.user.username },
-      update: { username: interaction.user.username },
-    });
+    try {
+      const guildId = interaction.guildId;
+      if (!guildId) {
+        await interaction.editReply({ content: '❌ Lệnh này chỉ dùng được trong Server.' });
+        return;
+      }
 
-    const guildRecord = await prisma.guild.upsert({
-      where: { discordGuildId: interaction.guildId! },
-      create: { discordGuildId: interaction.guildId! },
-      update: {},
-    });
+      const userRecord = await prisma.user.upsert({
+        where: { discordUserId: interaction.user.id },
+        create: { discordUserId: interaction.user.id, username: interaction.user.username },
+        update: { username: interaction.user.username },
+      });
 
-    await prisma.pomodoroSession.create({
-      data: {
-        userId: userRecord.id,
-        guildId: guildRecord.id,
-        channelId: voiceChannel.id,
-        workMinutes: workMins,
-        breakMinutes: breakMins,
-        status: 'WORK',
-        endsAt: new Date(Date.now() + workMins * 60_000),
-      },
-    });
+      const guildRecord = await prisma.guild.upsert({
+        where: { discordGuildId: guildId },
+        create: { discordGuildId: guildId },
+        update: {},
+      });
 
-    // Cập nhật chuỗi Streak học tập cho User
-    await recordUserActivity(interaction.user.id, interaction.user.username);
+      await prisma.pomodoroSession.create({
+        data: {
+          userId: userRecord.id,
+          guildId: guildRecord.id,
+          channelId: voiceChannel.id,
+          workMinutes: workMins,
+          breakMinutes: breakMins,
+          status: 'WORK',
+          endsAt: new Date(Date.now() + workMins * 60_000),
+        },
+      });
 
-    // Cập nhật trạng thái kênh thoại
-    await safeSetVoiceStatus(voiceChannel, `🍅 Đang tập trung Pomodoro (${workMins}m)`);
+      // Cập nhật chuỗi Streak học tập cho User (non-blocking)
+      recordUserActivity(interaction.user.id, interaction.user.username).catch((err) => {
+        logger.warn('Failed to update streak in pomodoro', { err: String(err) });
+      });
 
-    await interaction.editReply({
-      content: `🍅 **Bắt đầu Pomodoro**: ${workMins} phút học, ${breakMins} phút nghỉ. Chúc bạn học tốt!\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`,
-    });
+      // Cập nhật trạng thái kênh thoại (non-blocking)
+      safeSetVoiceStatus(voiceChannel, `🍅 Đang tập trung Pomodoro (${workMins}m)`).catch(() => {});
 
-    const runTimer = () => {
-      const timeout = setTimeout(async () => {
-        const nextStatus = stateMachine.advancePhase();
-        const textChannel = interaction.channel;
-        if (nextStatus === PomodoroStatus.BREAK) {
-          await safeSetVoiceStatus(voiceChannel, `☕ Giờ nghỉ giải lao (${breakMins}m)`);
-          if (textChannel && 'send' in textChannel) {
-            await (textChannel as any).send({ content: `☕ Hết giờ học! Hãy nghỉ ngơi **${breakMins} phút** nhé.` });
+      // Phản hồi người dùng ngay lập tức!
+      await interaction.editReply({
+        content: `🍅 **Bắt đầu Pomodoro**: ${workMins} phút học, ${breakMins} phút nghỉ. Chúc bạn học tốt!\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`,
+      });
+
+      const runTimer = () => {
+        const timeout = setTimeout(async () => {
+          const nextStatus = stateMachine.advancePhase();
+          const textChannel = interaction.channel;
+          if (nextStatus === PomodoroStatus.BREAK) {
+            safeSetVoiceStatus(voiceChannel, `☕ Giờ nghỉ giải lao (${breakMins}m)`).catch(() => {});
+            if (textChannel && 'send' in textChannel) {
+              await (textChannel as any).send({ content: `☕ Hết giờ học! Hãy nghỉ ngơi **${breakMins} phút** nhé.` }).catch(() => {});
+            }
+          } else {
+            safeSetVoiceStatus(voiceChannel, `🍅 Đang tập trung Pomodoro (${workMins}m)`).catch(() => {});
+            if (textChannel && 'send' in textChannel) {
+              await (textChannel as any).send({ content: `🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${workMins} phút**.` }).catch(() => {});
+            }
           }
-        } else {
-          await safeSetVoiceStatus(voiceChannel, `🍅 Đang tập trung Pomodoro (${workMins}m)`);
-          if (textChannel && 'send' in textChannel) {
-            await (textChannel as any).send({ content: `🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${workMins} phút**.` });
-          }
-        }
-        runTimer();
-      }, stateMachine.getDurationMs());
+          runTimer();
+        }, stateMachine.getDurationMs());
 
-      activeTimers.set(voiceChannel.id, timeout);
-    };
+        activeTimers.set(voiceChannel.id, timeout);
+      };
 
-    runTimer();
+      runTimer();
+    } catch (error) {
+      logger.error('Error starting pomodoro', { userId: interaction.user.id, error: String(error) });
+      await interaction.editReply({ content: '❌ Có lỗi xảy ra khi bắt đầu phiên Pomodoro. Vui lòng thử lại.' });
+    }
   }
 }

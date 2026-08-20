@@ -1,4 +1,4 @@
-import { VoiceChannel } from 'discord.js';
+import { VoiceChannel, Routes } from 'discord.js';
 import { logger } from '../utils/logger';
 
 export enum PomodoroStatus {
@@ -34,29 +34,37 @@ export const activeTimers = new Map<string, NodeJS.Timeout>();
 
 /**
  * Đặt hoặc xóa ghi chú trạng thái (Voice Channel Status) cho kênh thoại mà không làm đổi tên kênh gốc.
+ * Có cơ chế Timeout 2.5s để tuyệt đối không làm treo luồng phản hồi của bot.
  * @param channel Kênh voice của Discord
  * @param status Chuỗi trạng thái hiển thị (để null hoặc rỗng "" để xóa trạng thái)
  */
 export async function safeSetVoiceStatus(channel: VoiceChannel, status: string | null): Promise<boolean> {
+  const statusStr = status ?? '';
   try {
-    const voiceChan = channel as any;
-    if (typeof voiceChan.setStatus === 'function') {
-      await voiceChan.setStatus(status ?? '');
-      return true;
-    }
-    if (typeof voiceChan.sendVoiceStatus === 'function') {
-      await voiceChan.sendVoiceStatus(status ?? '');
-      return true;
-    }
-    if (channel.client?.rest) {
-      await channel.client.rest.put(`/channels/${channel.id}/voice-status` as any, {
-        body: { status: status ?? '' },
-      });
-      return true;
-    }
-    return false;
+    const updatePromise = (async () => {
+      const voiceChan = channel as any;
+      if (typeof voiceChan.setStatus === 'function') {
+        return voiceChan.setStatus(statusStr);
+      }
+      if (typeof voiceChan.sendVoiceStatus === 'function') {
+        return voiceChan.sendVoiceStatus(statusStr);
+      }
+      if (channel.client?.rest) {
+        return channel.client.rest.put(Routes.channelVoiceStatus(channel.id), {
+          body: { status: statusStr },
+        });
+      }
+      return false;
+    })();
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('VOICE_STATUS_TIMEOUT')), 2500)
+    );
+
+    await Promise.race([updatePromise, timeoutPromise]);
+    return true;
   } catch (error) {
-    logger.warn('Failed to update voice channel status', { channelId: channel.id, status, error: String(error) });
+    logger.warn('Failed to update voice channel status (non-critical)', { channelId: channel.id, status, error: String(error) });
     return false;
   }
 }
