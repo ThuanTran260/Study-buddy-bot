@@ -62,6 +62,26 @@ export async function execute(interaction: Interaction): Promise<void> {
     return;
   }
 
+  // 🛡️ Xử lý Autocomplete Interaction (Gợi ý danh sách bộ thẻ khi người dùng gõ)
+  if (interaction.isAutocomplete()) {
+    const command = commands.get(interaction.commandName);
+    if (!command || typeof command.autocomplete !== 'function') return;
+
+    try {
+      await command.autocomplete(interaction);
+    } catch (error) {
+      logger.warn('Error executing autocomplete', {
+        command: interaction.commandName,
+        userId: interaction.user.id,
+        error: String(error),
+      });
+      if (!interaction.responded) {
+        await interaction.respond([]).catch(() => {});
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = commands.get(interaction.commandName);

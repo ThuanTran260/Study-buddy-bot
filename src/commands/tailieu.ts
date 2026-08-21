@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
+  AutocompleteInteraction,
   EmbedBuilder,
 } from 'discord.js';
 import { extractDocumentContent, processStudyPackIngestion } from '../services/documentService';
@@ -18,6 +19,7 @@ export const data = new SlashCommandBuilder()
       .setDescription('Tên bộ thẻ bạn muốn lưu các thẻ nhớ Flashcard vào')
       .setRequired(true)
       .setMaxLength(100)
+      .setAutocomplete(true)
   )
   .addStringOption((opt) =>
     opt
@@ -31,6 +33,55 @@ export const data = new SlashCommandBuilder()
       .setDescription('Đính kèm file tài liệu học tập (.txt, .md — tối đa 1MB)')
       .setRequired(false)
   );
+
+/**
+ * ⚡ AUTOCOMPLETE HANDLER CHO /tailieu
+ */
+export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
+  const focusedOption = interaction.options.getFocused(true);
+
+  if (focusedOption.name === 'ten_bo_the') {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { discordUserId: interaction.user.id },
+        select: { id: true },
+      });
+
+      if (!user) {
+        await interaction.respond([]);
+        return;
+      }
+
+      const query = (focusedOption.value || '').trim();
+
+      const decks = await prisma.flashcardDeck.findMany({
+        where: {
+          userId: user.id,
+          ...(query ? { name: { contains: query, mode: 'insensitive' } } : {}),
+        },
+        take: 25,
+        select: {
+          name: true,
+          _count: { select: { cards: true } },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      const choices = decks.map((deck) => ({
+        name: `📁 ${deck.name} (Đã có ${deck._count.cards} thẻ - Nạp thêm)`.slice(0, 100),
+        value: deck.name.slice(0, 100),
+      }));
+
+      if (!interaction.responded) {
+        await interaction.respond(choices.slice(0, 25));
+      }
+    } catch (err) {
+      if (!interaction.responded) {
+        await interaction.respond([]).catch(() => {});
+      }
+    }
+  }
+}
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
