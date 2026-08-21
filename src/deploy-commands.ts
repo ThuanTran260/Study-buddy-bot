@@ -11,6 +11,8 @@ import { data as digestData } from './commands/digest';
 import { data as flashcardData } from './commands/flashcard';
 import { data as leaderboardData } from './commands/leaderboard';
 import { data as tailieuData } from './commands/tailieu';
+import { data as studyPlanData } from './commands/study-plan';
+import { data as groupData } from './commands/group';
 
 const commands = [
   hoiData.toJSON(),
@@ -24,6 +26,8 @@ const commands = [
   flashcardData.toJSON(),
   leaderboardData.toJSON(),
   tailieuData.toJSON(),
+  studyPlanData.toJSON(),
+  groupData.toJSON(),
 ];
 
 const rest = new REST().setToken(env.discordToken);

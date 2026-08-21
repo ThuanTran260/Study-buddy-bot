@@ -12,6 +12,8 @@ import * as digestCommand from '../commands/digest';
 import * as flashcardCommand from '../commands/flashcard';
 import * as leaderboardCommand from '../commands/leaderboard';
 import * as tailieuCommand from '../commands/tailieu';
+import * as studyPlanCommand from '../commands/study-plan';
+import * as groupCommand from '../commands/group';
 
 const commands = new Map<string, any>([
   ['hoi', hoiCommand],
@@ -25,6 +27,8 @@ const commands = new Map<string, any>([
   ['flashcard', flashcardCommand],
   ['leaderboard', leaderboardCommand],
   ['tailieu', tailieuCommand],
+  ['study-plan', studyPlanCommand],
+  ['group', groupCommand],
 ]);
 
 export const name = Events.InteractionCreate;

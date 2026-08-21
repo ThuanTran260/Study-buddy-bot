@@ -501,3 +501,25 @@ export function parseStudyPackResponse(raw: string): StudyPackData | null {
     return null;
   }
 }
+
+// ----------------------------------------------------
+// 📅 AI STUDY PLANNER & ADVISOR (/study-plan)
+// ----------------------------------------------------
+
+export async function generateStudyPlanAI(studyDataContext: string): Promise<string> {
+  const systemPrompt = `${BASE_SYSTEM_PROMPT}
+4. Bạn là Cố vấn Học tập Chuyên nghiệp (AI Study Advisor).
+5. Dựa trên dữ liệu học tập định lượng 14 ngày qua của sinh viên (bao gồm điểm số Quiz, các chủ đề Flashcard hay quên, số giờ Pomodoro tập trung, chuỗi Streak), hãy phân tích và đưa ra kế hoạch học tập 7 ngày tới.
+6. Cấu trúc câu trả lời bắt buộc gồm 4 phần rõ ràng (dùng Markdown, bullet points ngắn gọn):
+  - 📊 **1. Đánh giá Hiệu suất (Điểm mạnh & Điểm yếu)**
+  - ⚠️ **2. Các Chủ đề cần Ưu tiên Ôn tập Khẩn cấp**
+  - 📅 **3. Lịch trình Hành động 7 Ngày tới (7-Day Action Plan)**
+  - 🍅 **4. Chiến lược Phân bổ Thời gian & Pomodoro tối ưu**
+7. Viết bằng tiếng Việt tự nhiên, truyền cảm hứng, ngắn gọn, súc tích (tối đa 1.800 ký tự để vừa vặn trong Discord Embed).`;
+
+  return callAI({
+    systemPrompt,
+    userMessage: `Dưới đây là dữ liệu học tập 14 ngày qua của tôi:\n\n${studyDataContext}\n\nHãy lập kế hoạch học tập 7 ngày tiếp theo giúp tôi đạt kết quả tốt nhất!`,
+    maxTokens: 1200,
+  });
+}

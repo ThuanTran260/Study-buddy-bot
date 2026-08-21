@@ -22,6 +22,7 @@ model Guild {
   studyRooms       StudyRoom[]
   pomodoroSessions PomodoroSession[]
   flashcardDecks   FlashcardDeck[]
+  studyGroups      StudyGroup[]
 
   @@index([discordGuildId])
 }
@@ -41,6 +42,8 @@ model User {
   pomodoroSessions PomodoroSession[]
   flashcardDecks   FlashcardDeck[]
   aiUsageLogs      AiUsageLog[]
+  ownedGroups      StudyGroup[]       @relation("GroupOwner")
+  groupMembers     StudyGroupMember[]
 
   @@index([discordUserId])
 }
@@ -113,7 +116,7 @@ model Flashcard {
 model AiUsageLog {
   id          String   @id @default(uuid())
   userId      String
-  actionType  String   // "AI_QUESTION" | "AI_SUMMARIZE" | "AI_QUIZ" | "AI_FLASHCARD"
+  actionType  String   // "AI_QUESTION" | "AI_SUMMARIZE" | "AI_QUIZ" | "AI_FLASHCARD" | "AI_DOCUMENT_STUDY" | "AI_STUDY_PLAN"
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -152,4 +155,34 @@ model PomodoroSession {
 
   @@index([userId, status])
   @@index([channelId])
+}
+
+model StudyGroup {
+  id          String              @id @default(uuid())
+  name        String              @db.VarChar(50)
+  guildId     String
+  ownerId     String
+  maxMembers  Int                 @default(10)
+  createdAt   DateTime            @default(now())
+
+  guild   Guild              @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  owner   User               @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members StudyGroupMember[]
+
+  @@unique([guildId, name])
+  @@index([guildId])
+}
+
+model StudyGroupMember {
+  id        String     @id @default(uuid())
+  groupId   String
+  userId    String
+  joinedAt  DateTime   @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
 }
