@@ -222,9 +222,12 @@ async function startReviewSession(
         .setColor(0x5865f2)
         .setFooter({ text: `Lặp lại lần: ${card.repetition} • EF: ${card.easeFactor}` });
 
-      const flipRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('sm2_flip').setLabel('👁️ Lật Thẻ (Show Answer)').setStyle(ButtonStyle.Primary)
-      );
+      const flipButton = new ButtonBuilder()
+        .setCustomId('sm2_flip')
+        .setLabel('👁️ Lật Thẻ (Show Answer)')
+        .setStyle(ButtonStyle.Primary);
+
+      const flipRow = new ActionRowBuilder<ButtonBuilder>().addComponents(flipButton);
 
       const msg = await interaction.editReply({
         embeds: [frontEmbed],
@@ -235,13 +238,14 @@ async function startReviewSession(
       const collector = msg.createMessageComponentCollector({
         componentType: ComponentType.Button,
         filter: (i: any) => i.user.id === user.discordUserId,
-        time: 60_000,
+        time: 300_000, // 5 phút thời gian suy nghĩ
         max: 1,
       });
 
       collector.on('collect', async (btnInt: any) => {
         if (btnInt.customId === 'sm2_flip') {
-          await btnInt.deferUpdate();
+          // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
+          await btnInt.deferUpdate().catch(() => {});
 
           // BƯỚC B: Hiện mặt sau + 4 nút đánh giá độ nhớ
           const backEmbed = new EmbedBuilder()
@@ -254,12 +258,12 @@ async function startReviewSession(
             .setColor(0xfee75c)
             .setFooter({ text: 'Thuật toán SM-2 sẽ tính toán ngày ôn tiếp theo dựa trên đánh giá của bạn' });
 
-          const ratingRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-            new ButtonBuilder().setCustomId('sm2_rate_1').setLabel('🔴 Quên (1)').setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId('sm2_rate_3').setLabel('🟡 Khó (3)').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('sm2_rate_4').setLabel('🟢 Nhớ Tốt (4)').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('sm2_rate_5').setLabel('🌟 Rất Dễ (5)').setStyle(ButtonStyle.Primary)
-          );
+          const rBtn1 = new ButtonBuilder().setCustomId('sm2_rate_1').setLabel('🔴 Quên (1)').setStyle(ButtonStyle.Danger);
+          const rBtn3 = new ButtonBuilder().setCustomId('sm2_rate_3').setLabel('🟡 Khó (3)').setStyle(ButtonStyle.Secondary);
+          const rBtn4 = new ButtonBuilder().setCustomId('sm2_rate_4').setLabel('🟢 Nhớ Tốt (4)').setStyle(ButtonStyle.Success);
+          const rBtn5 = new ButtonBuilder().setCustomId('sm2_rate_5').setLabel('🌟 Rất Dễ (5)').setStyle(ButtonStyle.Primary);
+
+          const ratingRow = new ActionRowBuilder<ButtonBuilder>().addComponents(rBtn1, rBtn3, rBtn4, rBtn5);
 
           const ratingMsg = await interaction.editReply({
             embeds: [backEmbed],
@@ -270,12 +274,13 @@ async function startReviewSession(
           const ratingCollector = ratingMsg.createMessageComponentCollector({
             componentType: ComponentType.Button,
             filter: (i: any) => i.user.id === user.discordUserId,
-            time: 60_000,
+            time: 300_000, // 5 phút
             max: 1,
           });
 
           ratingCollector.on('collect', async (rateInt: any) => {
-            await rateInt.deferUpdate();
+            // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
+            await rateInt.deferUpdate().catch(() => {});
             const quality = Number(rateInt.customId.replace('sm2_rate_', ''));
 
             // Áp dụng thuật toán SM-2
@@ -297,7 +302,7 @@ async function startReviewSession(
             });
 
             // Cập nhật chuỗi Streak học tập
-            await recordUserActivity(user.discordUserId, user.username);
+            await recordUserActivity(user.discordUserId, user.username).catch(() => {});
             reviewedCount++;
 
             currentIndex++;
@@ -317,6 +322,27 @@ async function startReviewSession(
               await interaction.editReply({ embeds: [finishEmbed], components: [], allowedMentions: { parse: [] } });
             }
           });
+
+          ratingCollector.on('end', async (_: any, reason: string) => {
+            if (reason === 'time') {
+              const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                rBtn1.setDisabled(true),
+                rBtn3.setDisabled(true),
+                rBtn4.setDisabled(true),
+                rBtn5.setDisabled(true)
+              );
+              await interaction.editReply({ components: [disabledRow] }).catch(() => {});
+            }
+          });
+        }
+      });
+
+      collector.on('end', async (_: any, reason: string) => {
+        if (reason === 'time') {
+          const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            flipButton.setDisabled(true).setLabel('⏱️ Hết thời gian suy nghĩ (5 phút)')
+          );
+          await interaction.editReply({ components: [disabledRow] }).catch(() => {});
         }
       });
     };

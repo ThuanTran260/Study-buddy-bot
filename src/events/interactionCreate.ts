@@ -30,7 +30,7 @@ const commands = new Map<string, any>([
 export const name = Events.InteractionCreate;
 
 export async function execute(interaction: Interaction): Promise<void> {
-  // 🛡️ Xử lý các Button Interaction độc lập (Ví dụ: Nút tắt nhắc nhở trong DM)
+  // 🛡️ Xử lý các Button Interaction độc lập & Fallback an toàn cho button hết hạn
   if (interaction.isButton()) {
     if (interaction.customId === 'disable_daily_reminder') {
       try {
@@ -57,8 +57,18 @@ export async function execute(interaction: Interaction): Promise<void> {
       }
       return;
     }
-    // Các button interaction khác thuộc Component Collector (như Quiz A/B/C/D, Flashcard Flip/Rating)
-    // sẽ được bắt trực tiếp bởi collector của command tương ứng.
+
+    // 🛡️ SAFETY NET: Nếu sau 1.5s không có Component Collector nào nhận nút (do hết hạn hoặc bot vừa restart),
+    // tự động phản hồi để Discord KHÔNG BỊ LỖI "bot didn't respond in time"
+    setTimeout(async () => {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: '⏱️ Phiên tương tác này đã hết hạn (hoặc Bot vừa cập nhật). Bạn vui lòng gõ lại lệnh để tiếp tục nhé!',
+          ephemeral: true,
+        }).catch(() => {});
+      }
+    }, 1500);
+
     return;
   }
 
