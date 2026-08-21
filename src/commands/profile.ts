@@ -110,37 +110,40 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const reminderStatus = user.dailyReminderEnabled ? '🔔 Đang bật (07:00 AM)' : '🔕 Đang tắt';
 
     const embed = new EmbedBuilder()
-      .setTitle(`🎓 Hồ Sơ Học Tập: ${user.username}`)
-      .setDescription(`Danh hiệu hiện tại: **${titleBadge}**`)
+      .setAuthor({
+        name: `Hồ Sơ Sinh Viên: ${interaction.user.username}`,
+        iconURL: interaction.user.displayAvatarURL(),
+      })
+      .setTitle(`🎓 Bảng Thành Tích Cá Nhân`)
+      .setDescription(
+        `👑 **Danh hiệu:** ${titleBadge}\n` +
+          `🔥 **Chuỗi học liên tiếp (Streak):** **${user.streakCount} ngày**`
+      )
+      .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
       .setColor(0x5865f2)
       .addFields(
         {
-          name: '🔥 Chuỗi Ngày Học (Streak)',
-          value: `**${user.streakCount} ngày liên tiếp**`,
+          name: '📝 Trắc Nghiệm AI (/quiz)',
+          value: `• Tổng bài làm: **${totalQuizzes} bài**\n• Tổng câu hỏi: **${totalQuestions} câu**\n• Độ chính xác: **${quizAccuracy}%** (${totalCorrect}/${totalQuestions})`,
           inline: true,
         },
         {
-          name: '🍅 Thời Gian Pomodoro',
-          value: `**${pomoHours} giờ** (${user.pomodoroSessions.length} phiên)`,
+          name: '🍅 Tập Trung (/pomodoro)',
+          value: `• Tổng số phiên: **${user.pomodoroSessions.length} phiên**\n• Thời gian học: **${pomoHours} giờ** (${totalWorkMinutes} phút)`,
           inline: true,
         },
         {
-          name: '📝 Bài Làm Quiz',
-          value: `**${totalQuizzes} bài** (Độ chính xác: **${quizAccuracy}%**)`,
-          inline: true,
-        },
-        {
-          name: '🗂️ Thẻ Nhớ Flashcard (SM-2)',
-          value: `📚 **${totalDecks} bộ thẻ** (${totalCards} thẻ)\n⏰ **${dueCards} thẻ** cần ôn hôm nay`,
+          name: '🗂️ Thẻ Nhớ SM-2 (/flashcard)',
+          value: `• Bộ thẻ sở hữu: **${totalDecks} bộ**\n• Tổng số thẻ: **${totalCards} thẻ**\n• Thẻ cần ôn hôm nay: ⏰ **${dueCards} thẻ**`,
           inline: false,
         },
         {
-          name: '⚙️ Cài Đặt Nhắc Nhở',
-          value: `${reminderStatus} *(Dùng \`/profile nhac_nho: on/off\` để đổi)*`,
+          name: '⚙️ Cài Đặt Nhắc Nhở Hàng Ngày',
+          value: `${reminderStatus} *(Dùng \`/profile nhac_nho: on/off\` để thay đổi)*`,
           inline: false,
         }
       )
-      .setFooter({ text: 'Study Buddy Ecosystem • Giữ vững tinh thần học tập mỗi ngày!' })
+      .setFooter({ text: 'Study Buddy 3.0 • Giữ vững tinh thần học tập mỗi ngày!' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
