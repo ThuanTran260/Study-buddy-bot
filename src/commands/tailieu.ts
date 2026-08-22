@@ -180,6 +180,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       userFriendlyMsg = '⚠️ Bạn phải cung cấp đoạn văn bản (`noi_dung`) hoặc đính kèm một file tài liệu (`file`).';
     } else if (errorMsg === 'CONTENT_TOO_SHORT') {
       userFriendlyMsg = '⚠️ Tài liệu của bạn quá ngắn (dưới 50 ký tự). Vui lòng cung cấp nội dung chi tiết hơn.';
+    } else if (errorMsg === 'INVALID_BINARY_CONTENT') {
+      userFriendlyMsg = '⚠️ File tài liệu chứa định dạng nhị phân không hợp lệ. Vui lòng gửi file văn bản thuần túy (.txt, .md).';
     } else if (errorMsg === 'INVALID_FILE_TYPE') {
       userFriendlyMsg = '⚠️ Định dạng file không được hỗ trợ. Vui lòng chỉ gửi file `.txt` hoặc `.md`.';
     } else if (errorMsg === 'FILE_TOO_LARGE') {

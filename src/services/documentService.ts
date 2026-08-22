@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma';
 import { generateStudyPackJson, parseStudyPackResponse, StudyPackData, QuizQuestionData } from './aiService';
 import { recordDbAiUsage } from './dbRateLimiter';
 import { recordUserActivity } from './streakService';
+import { isPrintableText, sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 
 const MAX_DOCUMENT_CHARS = 12_000;
@@ -65,6 +66,11 @@ export async function extractDocumentContent(
     throw new Error('EMPTY_INPUT');
   }
 
+  // 🛡️ Kiểm tra chống file nhị phân giả mạo / null bytes
+  if (!isPrintableText(rawText)) {
+    throw new Error('INVALID_BINARY_CONTENT');
+  }
+
   if (rawText.trim().length < 50) {
     throw new Error('CONTENT_TOO_SHORT');
   }
@@ -100,7 +106,7 @@ export async function processStudyPackIngestion(
   deckName: string,
   documentContent: string
 ): Promise<IngestionResult> {
-  const cleanDeckName = deckName.trim();
+  const cleanDeckName = sanitizeUnicodeInput(deckName);
 
   // 1. Gọi AI sinh Study Pack dạng JSON
   const rawAiJson = await generateStudyPackJson(documentContent);

@@ -15,6 +15,7 @@ import { generateFlashcardsJson, parseFlashcardAIResponse } from '../services/ai
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
 import { resolveGuildId } from '../utils/guildResolver';
+import { sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -242,10 +243,15 @@ async function startReviewSession(
         max: 1,
       });
 
+      let isFlipCollected = false;
+
       collector.on('collect', async (btnInt: any) => {
         if (btnInt.customId === 'sm2_flip') {
           // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
           await btnInt.deferUpdate().catch(() => {});
+          if (isFlipCollected) return;
+          isFlipCollected = true;
+          collector.stop('flipped');
 
           // BƯỚC B: Hiện mặt sau + 4 nút đánh giá độ nhớ
           const backEmbed = new EmbedBuilder()
@@ -278,9 +284,15 @@ async function startReviewSession(
             max: 1,
           });
 
+          let isRatingCollected = false;
+
           ratingCollector.on('collect', async (rateInt: any) => {
             // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
             await rateInt.deferUpdate().catch(() => {});
+            if (isRatingCollected) return;
+            isRatingCollected = true;
+            ratingCollector.stop('rated');
+
             const quality = Number(rateInt.customId.replace('sm2_rate_', ''));
 
             // Áp dụng thuật toán SM-2

@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { resolveGuildId } from '../utils/guildResolver';
+import { sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -73,7 +74,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   // 1. TẠO NHÓM MỚI
   if (subcommand === 'create') {
-    const groupName = interaction.options.getString('ten_nhom', true).trim();
+    const rawGroupName = interaction.options.getString('ten_nhom', true).trim();
+    const groupName = sanitizeUnicodeInput(rawGroupName);
+
+    if (!groupName || groupName.length < 2) {
+      await interaction.reply({
+        content: '❌ Tên nhóm không hợp lệ hoặc quá ngắn. Vui lòng nhập lại tên nhóm.',
+        ephemeral: true,
+      });
+      return;
+    }
 
     try {
       // Kiểm tra xem User đã ở trong nhóm nào tại Guild này chưa
