@@ -1,9 +1,10 @@
 import http from 'http';
 import { sanitizeDiscordOutput, isPrintableText } from '../../src/utils/sanitize';
-import { parseStudyPackResponse, parseFlashcardAIResponse } from '../../src/services/aiService';
-import { startHealthServer, closeHealthServer, registerHealthClient } from '../../src/utils/healthServer';
-import { calculateStreakUpdate } from '../../src/utils/dateUtils';
+import { parseStudyPackResponse } from '../../src/services/aiService';
+import { startHealthServer, closeHealthServer, registerHealthClient, resetHealthRateLimiter } from '../../src/utils/healthServer';
 import { checkDbRateLimit } from '../../src/services/dbRateLimiter';
+import { execute as flashcardExecute } from '../../src/commands/flashcard';
+import { extractDocumentContent } from '../../src/services/documentService';
 import { prisma } from '../../src/config/prisma';
 
 jest.mock('../../src/config/prisma', () => ({
@@ -19,6 +20,7 @@ jest.mock('../../src/config/prisma', () => ({
       create: jest.fn(),
     },
     flashcard: {
+      findMany: jest.fn(),
       update: jest.fn(),
     },
     aiUsageLog: {
@@ -30,7 +32,7 @@ jest.mock('../../src/config/prisma', () => ({
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
-describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATTACKS)', () => {
+describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (10 REAL-WORLD ATTACKS)', () => {
   let healthServer: http.Server;
   const TEST_PORT = 3999;
 
@@ -50,6 +52,7 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATT
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetHealthRateLimiter();
   });
 
   // =========================================================================
@@ -59,7 +62,6 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATT
     const maliciousPayload = 'Chúc mừng bạn đã trúng thưởng! @everyone Hãy nhận quà tại <@&123456789012345678> ngay!';
     const sanitized = sanitizeDiscordOutput(maliciousPayload);
 
-    // Ký tự Zero-width space (\u200b) được chèn vào giữa @ và tên mention
     expect(sanitized).not.toContain('@everyone');
     expect(sanitized).not.toContain('<@&123456789012345678>');
     expect(sanitized).toContain('@\u200beveryone');
@@ -82,9 +84,9 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATT
   });
 
   // =========================================================================
-  // ATTACK 3: INDIRECT PROMPT INJECTION VIA DOCUMENT PAYLOAD
+  // ATTACK 3: JSON SCHEMA RESILIENCE (UNTAMPERED PARSING)
   // =========================================================================
-  it('Attack 3 [Indirect AI Injection]: Tài liệu chứa chỉ dẫn phá hoại cấu trúc JSON -> Zero-Trust parser xử lý an toàn', () => {
+  it('Attack 3 [JSON Schema & Structure Resilience]: AI trả về JSON sai cấu trúc -> Zero-Trust parser xử lý an toàn không crash', () => {
     const maliciousAiOutput = `
 \`\`\`json
 {
@@ -96,29 +98,46 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATT
 \`\`\`
     `;
 
-    // Parser không bao giờ crash, trả về null an toàn
     const result = parseStudyPackResponse(maliciousAiOutput);
     expect(result).toBeNull();
   });
 
   // =========================================================================
-  // ATTACK 4: IDOR (INSECURE DIRECT OBJECT REFERENCE)
+  // ATTACK 4: IDOR (INSECURE DIRECT OBJECT REFERENCE) - TEST COMMAND HANDLER THẬT
   // =========================================================================
-  it('Attack 4 [IDOR Data Hijack]: User A cố tình đoán ID để xem/sửa bộ thẻ của User B -> Bị cô lập dữ liệu bởi userId', async () => {
-    const userA_Id = 'user-a-uuid';
-    const userB_DeckId = 'deck-belonging-to-user-b';
+  it('Attack 4 [IDOR Data Hijack Defense]: Lệnh /flashcard review PHẢI bắt buộc ràng buộc userId trong query thật', async () => {
+    const userA = { id: 'user-a-uuid', discordUserId: 'discord-user-a', username: 'UserA' };
 
-    // Query bộ thẻ kèm điều kiện bắt buộc userId của người gọi
-    (mockPrisma.flashcardDeck.findUnique as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.user.upsert as jest.Mock).mockResolvedValue(userA);
+    (mockPrisma.flashcard.findMany as jest.Mock).mockResolvedValue([]);
 
-    const queriedDeck = await prisma.flashcardDeck.findUnique({
-      where: {
-        id: userB_DeckId,
-        userId: userA_Id, // <- Chốt chặn IDOR
+    const mockInteraction: any = {
+      user: { id: userA.discordUserId, username: userA.username },
+      options: {
+        getSubcommand: jest.fn().mockReturnValue('review'),
+        getString: jest.fn().mockReturnValue('Security'),
       },
-    });
+      deferReply: jest.fn().mockResolvedValue(undefined),
+      editReply: jest.fn().mockResolvedValue(undefined),
+      reply: jest.fn().mockResolvedValue(undefined),
+      deferred: false,
+      replied: false,
+    };
 
-    expect(queriedDeck).toBeNull();
+    // Gọi trực tiếp Command Handler thật của bot
+    await flashcardExecute(mockInteraction);
+
+    // Assert: Xác nhận Prisma query THỰC TẾ của bot phải chứa deck.userId = userA.id
+    expect(mockPrisma.flashcard.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          deck: expect.objectContaining({
+            userId: userA.id,
+            name: 'Security',
+          }),
+        }),
+      })
+    );
   });
 
   // =========================================================================
@@ -163,16 +182,46 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (8 REAL-WORLD ATT
 
     const parsed = JSON.parse(healthResponse.body);
     expect(parsed.status).toBe('ok');
-    expect(parsed.guilds).toBeUndefined(); // <- Đã loại bỏ hoàn toàn việc lộ thông tin nội bộ
+    expect(parsed.guilds).toBeUndefined();
     expect(parsed.version).toBeUndefined();
+  });
+
+  // =========================================================================
+  // ATTACK 9: RATE LIMITER IP SPOOFING & MEMORY DOS REJECTION (XFF BYPASS DEFENSE)
+  // =========================================================================
+  it('Attack 9 [Rate Limiter IP Spoofing & Memory DoS Defense]: Đổi X-Forwarded-For mỗi request -> KHÔNG được bypass rate limit, trả về 429', async () => {
+    const statusCodes: number[] = [];
+
+    for (let i = 1; i <= 65; i++) {
+      const res = await makeHttpRequest('GET', '/health', TEST_PORT, {
+        'X-Forwarded-For': `10.9.9.${i}`,
+      });
+      statusCodes.push(res.statusCode);
+    }
+
+    const blockedCount = statusCodes.filter((code) => code === 429).length;
+    // 60 request đầu qua (200), 5 request sau bị chặn (429) bởi Dual-Layer Rate Limiter
+    expect(blockedCount).toBe(5);
+  });
+
+  // =========================================================================
+  // ATTACK 10: PAYLOAD SIZE LIMIT DEFENSE (FILE OVERSIZE REJECTION)
+  // =========================================================================
+  it('Attack 10 [Payload Size Limit Defense]: Tải lên file có dung lượng 1.5MB (> 1MB) -> Bị chặn với lỗi FILE_TOO_LARGE ngay lập tức', async () => {
+    const oversizeBytes = 1.5 * 1024 * 1024; // 1.5MB
+
+    await expect(
+      extractDocumentContent(null, 'https://cdn.discordapp.com/large.txt', 'large.txt', oversizeBytes)
+    ).rejects.toThrow('FILE_TOO_LARGE');
   });
 });
 
-// Helper thực hiện HTTP request cho test
+// Helper thực hiện HTTP request cho test với hỗ trợ headers tùy chỉnh
 function makeHttpRequest(
   method: string,
   path: string,
-  port: number
+  port: number,
+  headers: Record<string, string> = {}
 ): Promise<{ statusCode: number; body: string }> {
   return new Promise((resolve, reject) => {
     const req = http.request(
@@ -181,6 +230,7 @@ function makeHttpRequest(
         port,
         path,
         method,
+        headers,
       },
       (res) => {
         let body = '';
