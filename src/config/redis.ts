@@ -1,4 +1,5 @@
 import Redis, { RedisOptions } from 'ioredis';
+import RedisMock from 'ioredis-mock';
 import { env } from './env';
 import { logger } from '../utils/logger';
 
@@ -13,11 +14,12 @@ const redisOptions: RedisOptions = {
   maxRetriesPerRequest: null,
 };
 
-// Nếu có biến môi trường REDIS_URL (thường là từ Upstash/Render)
-// Chúng ta sẽ dùng URL đó, ngược lại mặc định kết nối localhost cho dev
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-export const redisClient = new Redis(redisUrl, redisOptions);
+export const redisClient =
+  process.env.NODE_ENV === 'test'
+    ? (new RedisMock() as unknown as Redis)
+    : new Redis(redisUrl, redisOptions);
 
 redisClient.on('connect', () => {
   logger.info('🟢 Đã kết nối thành công tới Redis (Upstash/Local)');

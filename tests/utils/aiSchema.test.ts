@@ -1,4 +1,4 @@
-import { safeParseAIJson, StudyPackSchema, QuizResponseSchema } from '../../src/utils/aiSchema';
+import { safeParseAIJson, StudyPackSchema, StudyPackType } from '../../src/utils/aiSchema';
 
 describe('aiSchema Zod Validation', () => {
   it('should parse valid StudyPack wrapped in markdown', () => {
@@ -26,7 +26,7 @@ describe('aiSchema Zod Validation', () => {
     \`\`\`
     `;
 
-    const result = safeParseAIJson(raw, StudyPackSchema);
+    const result = safeParseAIJson(raw, StudyPackSchema) as StudyPackType | null;
     expect(result).not.toBeNull();
     expect(result?.summary).toBe("This is a summary of the text that is at least 10 chars.");
     expect(result?.flashcards.length).toBe(1);
@@ -56,7 +56,7 @@ describe('aiSchema Zod Validation', () => {
     }
     `;
 
-    const result = safeParseAIJson(raw, StudyPackSchema);
+    const result = safeParseAIJson(raw, StudyPackSchema) as StudyPackType | null;
     expect(result).not.toBeNull();
     expect(result?.summary).toBe("This is a summary of the text.");
     expect(result?.flashcards.length).toBe(1);

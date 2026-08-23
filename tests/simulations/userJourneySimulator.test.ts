@@ -129,19 +129,19 @@ describe('🌟 END-TO-END USER JOURNEY SIMULATION HARNESS (10 SCENARIOS)', () =>
   // =========================================================================
   // JOURNEY 5: TRÍ NHỚ HỘI THOẠI AI MULTI-TURN & TỰ HỦY 30 PHÚT
   // =========================================================================
-  it('Journey 5: Hội thoại với AI nhớ ngữ cảnh và tự động giải phóng sau 30 phút TTL', () => {
+  it('Journey 5: Hội thoại với AI nhớ ngữ cảnh và tự động giải phóng sau 30 phút TTL', async () => {
     const userId = 'student-multi-turn';
-    clearConversation(userId);
+    await clearConversation(userId);
 
-    addToConversation(userId, 'user', 'Xin chào, tôi muốn học Docker');
-    addToConversation(userId, 'model', 'Chào bạn, Docker là nền tảng containerization.');
+    await addToConversation(userId, 'user', 'Xin chào, tôi muốn học Docker');
+    await addToConversation(userId, 'model', 'Chào bạn, Docker là nền tảng containerization.');
 
-    const history1 = getConversationHistory(userId);
+    const history1 = await getConversationHistory(userId);
     expect(history1.length).toBe(2);
 
     // Xóa lịch sử khi người dùng yêu cầu reset
-    clearConversation(userId);
-    const history2 = getConversationHistory(userId);
+    await clearConversation(userId);
+    const history2 = await getConversationHistory(userId);
     expect(history2.length).toBe(0);
   });
 

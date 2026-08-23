@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 import { ConversationMessage } from './conversationMemory';
 import {
   safeParseAIJson,
+  stripMarkdownJson,
   QuizResponseSchema,
   FlashcardResponseSchema,
   StudyPackSchema,
@@ -15,6 +16,7 @@ import {
 } from '../utils/aiSchema';
 
 export { QuizQuestionData, FlashcardItemData, StudyPackData };
+export const extractValidJson = stripMarkdownJson;
 
 const BASE_SYSTEM_PROMPT = `Bạn là Study Buddy — trợ lý học tập thông minh cho sinh viên.
 Quy tắc bắt buộc:

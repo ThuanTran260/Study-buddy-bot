@@ -63,3 +63,10 @@ export async function getConversationMessageCount(discordUserId: string): Promis
   const key = getRedisKey(discordUserId);
   return redisClient.llen(key);
 }
+
+/**
+ * Compatibility shim (Redis handles TTL automatically)
+ */
+export function pruneExpiredConversations(): number {
+  return 0;
+}
