@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, VoiceChannel, GuildMember } from 'discord.js';
-import { PomodoroStateMachine, PomodoroStatus, activeTimers, safeSetVoiceStatus } from '../services/pomodoroService';
+import { PomodoroStateMachine, PomodoroStatus, activeTimers, safeSetVoiceStatus, savePomodoroState, removePomodoroState } from '../services/pomodoroService';
 import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
@@ -34,6 +34,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         clearTimeout(timer);
         activeTimers.delete(voiceChannel.id);
       }
+      
+      // Xóa state trong Redis
+      await removePomodoroState(voiceChannel.id);
 
       // Xóa sạch ghi chú trạng thái kênh voice (non-blocking)
       safeSetVoiceStatus(voiceChannel, '').catch(() => {});
@@ -57,12 +60,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const breakMins = interaction.options.getInteger('nghi') ?? 5;
     const stateMachine = new PomodoroStateMachine({ workMinutes: workMins, breakMinutes: breakMins });
 
-    // ⚡ PHẢN HỒI TỨC THÌ (< 30ms) - Triệt tiêu 100% thời gian "is thinking..."
     await interaction.reply({
       content: `🍅 **Bắt đầu Pomodoro**: ${workMins} phút học, ${breakMins} phút nghỉ. Chúc bạn học tốt!\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`,
     });
 
-    // Chạy các tác vụ lưu CSDL và cập nhật trạng thái ngầm (Background Task)
     (async () => {
       try {
         const guildId = interaction.guildId;
@@ -99,10 +100,24 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       }
     })();
 
-    const runTimer = () => {
+    const runTimer = async (status: PomodoroStatus) => {
+      const durationMs = status === PomodoroStatus.WORK ? workMins * 60_000 : breakMins * 60_000;
+      const endsAt = Date.now() + durationMs;
+
+      // Lưu trạng thái vào Redis để auto-resume nếu bot restart
+      await savePomodoroState(voiceChannel.id, {
+        channelId: voiceChannel.id,
+        textChannelId: interaction.channelId,
+        workMins,
+        breakMins,
+        status,
+        endsAt
+      });
+
       const timeout = setTimeout(async () => {
         const nextStatus = stateMachine.advancePhase();
         const textChannel = interaction.channel;
+        
         if (nextStatus === PomodoroStatus.BREAK) {
           safeSetVoiceStatus(voiceChannel, `☕ Giờ nghỉ giải lao (${breakMins}m)`).catch(() => {});
           if (textChannel && 'send' in textChannel) {
@@ -114,12 +129,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             await (textChannel as any).send({ content: `🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${workMins} phút**.` });
           }
         }
-        runTimer();
-      }, stateMachine.getDurationMs());
+        
+        runTimer(nextStatus);
+      }, durationMs);
 
       activeTimers.set(voiceChannel.id, timeout);
     };
 
-    runTimer();
+    runTimer(PomodoroStatus.WORK);
   }
 }

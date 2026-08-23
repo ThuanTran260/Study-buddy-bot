@@ -83,6 +83,8 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
   }
 }
 
+import { aiDocumentQueue } from '../workers/aiWorker';
+
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
   const deckName = interaction.options.getString('ten_bo_the', true).trim();
@@ -116,66 +118,31 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     // 2.5. Resolve Discord Guild ID → Internal Guild UUID (FK-safe)
     const internalGuildId = await resolveGuildId(interaction.guildId);
 
-    // 3. Xử lý qua AI Pipeline và lưu CSDL
-    const result = await processStudyPackIngestion(
-      user.id,
+    // 3. Đưa Job vào Background Queue thay vì chờ đồng bộ
+    await aiDocumentQueue.add('process-document', {
+      userId: user.id,
       discordUserId,
-      interaction.user.username,
-      internalGuildId,
+      username: interaction.user.username,
+      guildId: internalGuildId,
       deckName,
-      extracted.text
-    );
-
-    const embed = new EmbedBuilder()
-      .setTitle(`📑 Trọn Bộ Học Tập Study Pack: "${result.deckName}"`)
-      .setColor(0x57f287)
-      .setTimestamp();
-
-    let desc = `Study Buddy AI đã phân tích tài liệu của bạn và tự động khởi tạo trọn bộ công cụ học tập!\n`;
-    if (extracted.truncated) {
-      desc += `\n*(ℹ️ Tài liệu dài đã được cắt gọn 12.000 ký tự đầu tiên để phân tích trọng tâm)*\n`;
-    }
-    embed.setDescription(desc);
-
-    // Field 1: Tóm tắt bài học
-    embed.addFields({
-      name: '📝 Tóm Tắt Luận Điểm Cốt Lõi',
-      value: result.summary.slice(0, 1024),
-      inline: false,
+      documentContent: extracted.text,
+      truncated: extracted.truncated,
+      webhookToken: interaction.token,
+      applicationId: interaction.client.user.id, // Application ID (user.id của bot)
     });
 
-    // Field 2: Thẻ nhớ Flashcard
-    const deckStatusText = result.isAppended
-      ? `Đã nạp thêm **${result.flashcardCount} thẻ mới** vào bộ thẻ có sẵn \`${result.deckName}\``
-      : `Đã tạo bộ thẻ mới \`${result.deckName}\` với **${result.flashcardCount} thẻ ghi nhớ**`;
+    const pendingEmbed = new EmbedBuilder()
+      .setTitle(`⏳ Đang xử lý tài liệu: "${deckName}"`)
+      .setDescription(`Bot đang cặm cụi đọc tài liệu của bạn (có thể mất 30-60 giây). Bạn có thể lướt Discord, kết quả sẽ tự động hiển thị ở tin nhắn này khi hoàn thành!`)
+      .setColor(0xfee75c)
+      .setFooter({ text: `Hàng đợi: AI Background Job Worker` });
 
-    embed.addFields({
-      name: '🗂️ Thẻ Nhớ Ghi Nhớ Lâu Dài (SM-2)',
-      value: `✅ ${deckStatusText}!\n💡 Gõ \`/flashcard review ten_bo_the: "${result.deckName}"\` để bắt đầu chu kỳ ôn tập.`,
-      inline: false,
-    });
-
-    // Field 3: Câu hỏi kiểm tra mẫu
-    if (result.sampleQuiz) {
-      const q = result.sampleQuiz;
-      const optionsText = q.options.map((o) => `**${o.label}.** ${o.text}`).join('\n');
-      embed.addFields({
-        name: '🎯 Câu Hỏi Tự Đánh Giá Mẫu',
-        value: `**${q.question}**\n${optionsText}\n*(Đáp án đúng: **${q.correctOption}** — ${q.explanation})*`,
-        inline: false,
-      });
-    }
-
-    embed.setFooter({
-      text: `🔥 Chuỗi Streak đã được cập nhật • Còn lại: ${limitCheck.remaining - 1}/3 lượt hôm nay`,
-    });
-
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [pendingEmbed] });
   } catch (error: any) {
     const errorMsg = error.message || String(error);
     logger.error('Error executing /tailieu', { userId: user.id, error: errorMsg });
 
-    let userFriendlyMsg = '❌ Có lỗi xảy ra khi xử lý tài liệu học tập.';
+    let userFriendlyMsg = '❌ Có lỗi xảy ra khi trích xuất tài liệu.';
     if (errorMsg === 'EMPTY_INPUT') {
       userFriendlyMsg = '⚠️ Bạn phải cung cấp đoạn văn bản (`noi_dung`) hoặc đính kèm một file tài liệu (`file`).';
     } else if (errorMsg === 'CONTENT_TOO_SHORT') {
@@ -188,10 +155,6 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       userFriendlyMsg = '⚠️ Dung lượng file quá lớn. Vui lòng chọn file dưới 1MB.';
     } else if (errorMsg === 'FETCH_TIMEOUT') {
       userFriendlyMsg = '⏱️ Tải file từ Discord bị quá thời gian chờ. Vui lòng thử lại sau.';
-    } else if (errorMsg === 'AI_TIMEOUT') {
-      userFriendlyMsg = '⏱️ AI mất quá nhiều thời gian phản hồi. Vui lòng thử lại với tài liệu ngắn hơn.';
-    } else if (errorMsg === 'AI_PARSING_FAILED') {
-      userFriendlyMsg = '⚠️ AI chưa thể bóc tách nội dung tài liệu này thành Study Pack. Vui lòng kiểm tra lại văn bản.';
     }
 
     await interaction.editReply({ content: userFriendlyMsg });

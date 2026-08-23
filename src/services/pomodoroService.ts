@@ -30,7 +30,38 @@ export class PomodoroStateMachine {
   stop(): void { this.status = PomodoroStatus.STOPPED; }
 }
 
+import { redisClient } from '../config/redis';
+
+export const POMODORO_REDIS_KEY = 'pomodoro:active_sessions';
+
+export interface PomodoroState {
+  channelId: string;
+  textChannelId: string;
+  workMins: number;
+  breakMins: number;
+  status: PomodoroStatus;
+  endsAt: number; // timestamp
+}
+
 export const activeTimers = new Map<string, NodeJS.Timeout>();
+
+export async function savePomodoroState(channelId: string, state: PomodoroState): Promise<void> {
+  await redisClient.hset(POMODORO_REDIS_KEY, channelId, JSON.stringify(state));
+}
+
+export async function getPomodoroState(channelId: string): Promise<PomodoroState | null> {
+  const data = await redisClient.hget(POMODORO_REDIS_KEY, channelId);
+  return data ? JSON.parse(data) : null;
+}
+
+export async function removePomodoroState(channelId: string): Promise<void> {
+  await redisClient.hdel(POMODORO_REDIS_KEY, channelId);
+}
+
+export async function getAllPomodoroStates(): Promise<PomodoroState[]> {
+  const data = await redisClient.hgetall(POMODORO_REDIS_KEY);
+  return Object.values(data).map((v) => JSON.parse(v));
+}
 
 /**
  * Đặt hoặc xóa ghi chú trạng thái (Voice Channel Status) cho kênh thoại mà không làm đổi tên kênh gốc.

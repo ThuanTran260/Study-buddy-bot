@@ -28,15 +28,18 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const discordUserId = interaction.user.id;
   const isNewTopic = interaction.options.getBoolean('moi') ?? false;
 
-  if (isNewTopic) {
-    clearConversation(discordUserId);
-  }
+  const userQuestion = interaction.options.getString('cau_hoi', true);
+  const isNew = interaction.options.getBoolean('moi') ?? false;
 
   const user = await prisma.user.upsert({
     where: { discordUserId },
     create: { discordUserId, username: interaction.user.username },
     update: { username: interaction.user.username },
   });
+
+  if (isNew) {
+    await clearConversation(discordUserId);
+  }
 
   const limitResult = await checkDbRateLimit(user.id, 'AI_QUESTION');
   if (!limitResult.allowed) {
@@ -45,23 +48,22 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   }
 
   await interaction.deferReply();
-  const question = interaction.options.getString('cau_hoi', true);
 
   try {
     // 🧠 Lấy lịch sử hội thoại trước đó (nếu có)
-    const history = getConversationHistory(discordUserId);
+    const history = await getConversationHistory(discordUserId);
 
     // Gọi AI với ngữ cảnh đa lượt
-    const answer = await askAIWithContext(question, history);
+    const answer = await askAIWithContext(userQuestion, history);
 
     // Lưu câu hỏi và câu trả lời vào bộ nhớ ngắn hạn
-    addToConversation(discordUserId, 'user', question);
-    addToConversation(discordUserId, 'model', answer);
+    await addToConversation(discordUserId, 'user', userQuestion);
+    await addToConversation(discordUserId, 'model', answer);
 
     await recordDbAiUsage(user.id, 'AI_QUESTION');
 
     const { embedChunk, followUpChunks } = splitForEmbedAndFollowUp(answer);
-    const msgCount = Math.floor(getConversationMessageCount(discordUserId) / 2);
+    const msgCount = Math.floor((await getConversationMessageCount(discordUserId)) / 2);
 
     const contextStatus =
       msgCount > 1
