@@ -8,7 +8,7 @@ import {
   AttachmentBuilder,
 } from 'discord.js';
 import { askAIWithVisualRouter } from '../services/aiService';
-import { renderMermaidToBuffer } from '../services/visualService';
+import { renderMermaidToBuffer, extractMermaidCode } from '../services/visualService';
 import { aiImageQueue } from '../workers/imageWorker';
 import {
   getConversationHistory,
@@ -85,9 +85,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: `${contextStatus} • Hỏi bởi ${interaction.user.username}` })
       .setTimestamp();
 
-    // 📊 XỬ LÝ SƠ ĐỒ MERMAID TỰ ĐỘNG
-    if (aiResult.hasVisual && aiResult.visualType === 'mermaid' && aiResult.visualPromptOrCode) {
-      const mermaidBuffer = await renderMermaidToBuffer(aiResult.visualPromptOrCode);
+    // 📊 XỬ LÝ SƠ ĐỒ MERMAID TỰ ĐỘNG (Từ Structured Schema HOẶC Tự động bóc tách từ Text)
+    const detectedMermaidCode =
+      (aiResult.hasVisual && aiResult.visualType === 'mermaid' && aiResult.visualPromptOrCode)
+        ? aiResult.visualPromptOrCode
+        : extractMermaidCode(answer);
+
+    if (detectedMermaidCode) {
+      const mermaidBuffer = await renderMermaidToBuffer(detectedMermaidCode);
 
       if (mermaidBuffer) {
         const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.png' });
@@ -99,7 +104,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         });
       } else {
         // 🛡️ Multi-tier fallback về Markdown Codeblock nếu QuickChart timeout
-        const fallbackDesc = `${embedChunk}\n\n📊 **Sơ đồ học tập:**\n\`\`\`mermaid\n${aiResult.visualPromptOrCode}\n\`\`\``;
+        const fallbackDesc = answer.includes('```mermaid')
+          ? embedChunk
+          : `${embedChunk}\n\n📊 **Sơ đồ học tập:**\n\`\`\`mermaid\n${detectedMermaidCode}\n\`\`\``;
         embed.setDescription(fallbackDesc.slice(0, 4096));
         await interaction.editReply({
           embeds: [embed],

@@ -1,4 +1,4 @@
-import { renderMermaidToBuffer, generateAiIllustration } from '../../src/services/visualService';
+import { renderMermaidToBuffer, generateAiIllustration, extractMermaidCode } from '../../src/services/visualService';
 
 describe('visualService', () => {
   const originalFetch = global.fetch;
@@ -8,8 +8,28 @@ describe('visualService', () => {
     jest.restoreAllMocks();
   });
 
+  describe('extractMermaidCode', () => {
+    it('extracts code from markdown block ```mermaid ... ```', () => {
+      const text = 'Chào bạn, đây là sơ đồ:\n```mermaid\nsequenceDiagram\n  Client->>Server: Login\n```\nChúc bạn học tốt!';
+      const extracted = extractMermaidCode(text);
+      expect(extracted).toBe('sequenceDiagram\n  Client->>Server: Login');
+    });
+
+    it('extracts un-fenced sequenceDiagram keyword directly from raw text', () => {
+      const text = 'Chào bạn!\nsequenceDiagram\n  autonumber\n  Client->>Server: Login\n\nGiải thích...';
+      const extracted = extractMermaidCode(text);
+      expect(extracted).toContain('sequenceDiagram');
+      expect(extracted).toContain('Client->>Server: Login');
+    });
+
+    it('returns null when text contains no mermaid syntax', () => {
+      const text = 'Chỉ là câu trả lời văn bản thông thường không có sơ đồ.';
+      expect(extractMermaidCode(text)).toBeNull();
+    });
+  });
+
   describe('renderMermaidToBuffer', () => {
-    it('returns Buffer when QuickChart responds with 200 OK', async () => {
+    it('returns Buffer when QuickChart responds with 200 OK via POST', async () => {
       const mockPngBuffer = Buffer.from('fake-png-binary-data');
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -20,8 +40,11 @@ describe('visualService', () => {
       expect(result).not.toBeNull();
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('quickchart.io/mermaid?mermaid='),
-        expect.any(Object)
+        'https://quickchart.io/mermaid',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ mermaid: 'flowchart TD\n  A --> B', width: 1024 }),
+        })
       );
     });
 
@@ -33,8 +56,11 @@ describe('visualService', () => {
 
       await renderMermaidToBuffer('```mermaid\nflowchart LR\n  Start --> Stop\n```');
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(encodeURIComponent('flowchart LR\n  Start --> Stop')),
-        expect.any(Object)
+        'https://quickchart.io/mermaid',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ mermaid: 'flowchart LR\n  Start --> Stop', width: 1024 }),
+        })
       );
     });
 

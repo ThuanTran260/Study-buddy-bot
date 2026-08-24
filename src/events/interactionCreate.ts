@@ -105,15 +105,37 @@ export async function execute(interaction: Interaction): Promise<void> {
           return;
         }
 
-        // 4. Làm mờ nút bấm ngay lập tức trên tin nhắn gốc
+        // 4. Kiểm tra xem tin nhắn có chứa mã Mermaid không
+        const { extractMermaidCode, renderMermaidToBuffer } = await import('../services/visualService');
+        const originalEmbed = interaction.message.embeds[0];
+        const originalText = originalEmbed?.description || '';
+        const mermaidCode = extractMermaidCode(originalText);
+
+        if (mermaidCode) {
+          // 4.1. Render trực tiếp Sơ đồ Mermaid trong 1 giây
+          const { AttachmentBuilder, EmbedBuilder } = await import('discord.js');
+          const mermaidBuffer = await renderMermaidToBuffer(mermaidCode);
+
+          if (mermaidBuffer) {
+            const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.png' });
+            const updatedEmbed = EmbedBuilder.from(originalEmbed)
+              .setImage('attachment://diagram.png');
+
+            await interaction.update({
+              embeds: [updatedEmbed],
+              files: [attachment],
+              components: [],
+            });
+            return;
+          }
+        }
+
+        // 4.2. Làm mờ nút bấm ngay lập tức trên tin nhắn gốc
         await interaction.update({
           components: [],
         });
 
-        const originalEmbed = interaction.message.embeds[0];
-        const originalText = originalEmbed?.description || '';
-
-        // 5. Đẩy vào BullMQ Background Queue
+        // 5. Nếu không phải Mermaid -> Đẩy vào BullMQ Background Queue cho Imagen 3 / DALL-E
         const { aiImageQueue } = await import('../workers/imageWorker');
         await aiImageQueue.add('generate-image', {
           userId: userRecord.id,

@@ -10,7 +10,53 @@ const MERMAID_TIMEOUT_MS = 3000;
 const MAX_IMAGE_BUFFER_BYTES = 2 * 1024 * 1024; // 2MB memory bound
 
 /**
- * Gửi mã Mermaid tới QuickChart để render thành Buffer ảnh PNG.
+ * Tự động bóc tách khối mã Mermaid từ câu trả lời văn bản của AI
+ */
+export function extractMermaidCode(text: string): string | null {
+  if (!text) return null;
+
+  // 1. Tìm trong khối code ```mermaid ... ```
+  const blockMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
+  if (blockMatch && blockMatch[1].trim()) {
+    return blockMatch[1].trim();
+  }
+
+  // 2. Tìm khối bắt đầu bằng từ khóa Mermaid kinh điển
+  const keywords = [
+    'sequenceDiagram',
+    'flowchart TD',
+    'flowchart LR',
+    'flowchart TB',
+    'flowchart RL',
+    'graph TD',
+    'graph LR',
+    'graph TB',
+    'classDiagram',
+    'stateDiagram',
+    'erDiagram',
+    'gantt',
+    'pie',
+  ];
+
+  for (const kw of keywords) {
+    const idx = text.indexOf(kw);
+    if (idx !== -1) {
+      // Cắt từ từ khóa đến hết khối hoặc đến dấu backtick
+      let candidate = text.slice(idx);
+      const endBacktick = candidate.indexOf('```');
+      if (endBacktick !== -1) {
+        candidate = candidate.slice(0, endBacktick);
+      }
+      return candidate.trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Gửi mã Mermaid tới QuickChart (qua POST) để render thành Buffer ảnh PNG.
+ * Sử dụng POST để chống lỗi URL Too Long với các sơ đồ Sequence/Flowchart phức tạp.
  * Nếu timeout (>3s) hoặc lỗi, trả về null để kích hoạt cơ chế Fallback Markdown.
  */
 export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer | null> {
@@ -25,11 +71,15 @@ export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer
   const timeoutId = setTimeout(() => controller.abort(), MERMAID_TIMEOUT_MS);
 
   try {
-    const encoded = encodeURIComponent(cleanedCode);
-    const url = `https://quickchart.io/mermaid?mermaid=${encoded}&format=png`;
-
-    const response = await fetch(url, {
-      method: 'GET',
+    const response = await fetch('https://quickchart.io/mermaid', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mermaid: cleanedCode,
+        width: 1024,
+      }),
       signal: controller.signal,
     });
 
