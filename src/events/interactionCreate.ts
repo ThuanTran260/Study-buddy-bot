@@ -62,6 +62,79 @@ export async function execute(interaction: Interaction): Promise<void> {
       return;
     }
 
+    // 🎨 XỬ LÝ NÚT BẤM SINH ẢNH / SƠ ĐỒ MINH HỌA (btn_visual_...)
+    if (interaction.customId.startsWith('btn_visual_')) {
+      const parts = interaction.customId.split('_');
+      const originalUserId = parts[parts.length - 1];
+
+      // 1. Author Guard: Chỉ người hỏi mới có quyền bấm
+      if (interaction.user.id !== originalUserId) {
+        await interaction.reply({
+          content: '⚠️ Chỉ người đặt câu hỏi ban đầu mới có quyền yêu cầu tạo ảnh cho tin nhắn này.',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const { redisClient } = await import('../config/redis');
+      const lockKey = `visual_lock:${interaction.message.id}`;
+
+      // 2. Atomic Redis Lock: Chống click đúp và spam nhiều request
+      const acquired = await redisClient.set(lockKey, '1', 'EX', 60, 'NX');
+      if (!acquired) {
+        await interaction.reply({
+          content: '⏳ Đang có một tiến trình tạo ảnh cho câu trả lời này rồi. Vui lòng chờ vài giây nhé!',
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        const userRecord = await prisma.user.upsert({
+          where: { discordUserId: interaction.user.id },
+          create: { discordUserId: interaction.user.id, username: interaction.user.username },
+          update: { username: interaction.user.username },
+        });
+
+        // 3. Kiểm tra hạn mức sinh ảnh
+        const { checkDbRateLimit } = await import('../services/dbRateLimiter');
+        const limitCheck = await checkDbRateLimit(userRecord.id, 'AI_IMAGE_GEN');
+        if (!limitCheck.allowed) {
+          await redisClient.del(lockKey);
+          await interaction.reply({ content: limitCheck.message!, ephemeral: true });
+          return;
+        }
+
+        // 4. Làm mờ nút bấm ngay lập tức trên tin nhắn gốc
+        await interaction.update({
+          components: [],
+        });
+
+        const originalEmbed = interaction.message.embeds[0];
+        const originalText = originalEmbed?.description || '';
+
+        // 5. Đẩy vào BullMQ Background Queue
+        const { aiImageQueue } = await import('../workers/imageWorker');
+        await aiImageQueue.add('generate-image', {
+          userId: userRecord.id,
+          prompt: `Illustrate this study concept: ${originalText.slice(0, 300)}`,
+          originalQuestion: originalEmbed?.title || 'Câu hỏi học tập',
+          originalAnswer: originalText,
+          webhookToken: interaction.token,
+          applicationId: interaction.client.user.id,
+        });
+
+        await interaction.followUp({
+          content: '🎨 Đã nhận lệnh! Bot đang cặm cụi vẽ ảnh minh họa dưới nền và sẽ cập nhật vào tin nhắn trong giây lát.',
+          ephemeral: true,
+        });
+      } catch (err) {
+        logger.error('Error handling btn_visual interaction', { error: String(err) });
+        await redisClient.del(lockKey);
+      }
+      return;
+    }
+
     // 🛡️ SAFETY NET: Nếu sau 1.5s không có Component Collector nào nhận nút (do hết hạn hoặc bot vừa restart),
     // tự động phản hồi để Discord KHÔNG BỊ LỖI "bot didn't respond in time"
     setTimeout(async () => {

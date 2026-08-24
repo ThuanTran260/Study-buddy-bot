@@ -8,6 +8,7 @@ import { cleanupOldAiUsageLogs } from './services/cleanupService';
 import { sendWeeklyDigestToAllUsers } from './services/weeklyDigestService';
 import { sendDailyFlashcardReminder } from './services/dailyReminderService';
 import { aiDocumentWorker } from './workers/aiWorker';
+import { aiImageWorker } from './workers/imageWorker';
 import { getAllPomodoroStates, removePomodoroState, PomodoroStateMachine, PomodoroStatus, safeSetVoiceStatus, activeTimers } from './services/pomodoroService';
 import * as interactionCreate from './events/interactionCreate';
 import * as voiceStateUpdate from './events/voiceStateUpdate';
@@ -38,6 +39,10 @@ client.once(Events.ClientReady, async (readyClient) => {
   // Đảm bảo Worker của BullMQ sẵn sàng
   aiDocumentWorker.on('ready', () => {
     logger.info('✅ BullMQ Worker (AI Document Ingestion) đã sẵn sàng lắng nghe hàng đợi.');
+  });
+
+  aiImageWorker.on('ready', () => {
+    logger.info('✅ BullMQ Worker (AI Image Generation) đã sẵn sàng lắng nghe hàng đợi.');
   });
 
   // Tái thiết lập các phiên Pomodoro đang chạy dở dang từ Redis

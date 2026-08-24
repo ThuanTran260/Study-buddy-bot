@@ -390,3 +390,51 @@ export function safeParseAIJson<T>(
     return null;
   }
 }
+
+// ----------------------------------------------------
+// MULTI-MODAL VISUAL RESPONSE SCHEMA
+// ----------------------------------------------------
+
+export const VisualResponseSchema = z.preprocess(
+  (val: any) => {
+    if (!val || typeof val !== 'object') return val;
+    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' ? val[0] : val;
+
+    const textAnswer = root.textAnswer || root.answer || root.text || root.explanation || root.content || '';
+    const hasVisual = Boolean(
+      root.hasVisual ||
+      root.visual ||
+      root.needsVisual ||
+      root.diagram ||
+      root.hasDiagram ||
+      root.isDiagram ||
+      root.visualType === 'mermaid' ||
+      root.visualType === 'diagram' ||
+      root.visualType === 'image' ||
+      root.visualType === 'illustration'
+    );
+    const visualType = root.visualType === 'mermaid' || root.visualType === 'diagram' 
+      ? 'mermaid' 
+      : root.visualType === 'image' || root.visualType === 'illustration'
+      ? 'image'
+      : undefined;
+
+    const visualPromptOrCode = root.visualPromptOrCode || root.code || root.mermaid || root.prompt || root.mermaidCode || undefined;
+
+    return {
+      textAnswer: typeof textAnswer === 'string' ? textAnswer.trim() : JSON.stringify(textAnswer),
+      hasVisual,
+      visualType,
+      visualPromptOrCode: typeof visualPromptOrCode === 'string' ? visualPromptOrCode.trim() : undefined,
+    };
+  },
+  z.object({
+    textAnswer: z.string().min(1),
+    hasVisual: z.boolean().default(false),
+    visualType: z.enum(['mermaid', 'image']).optional(),
+    visualPromptOrCode: z.string().optional(),
+  })
+);
+
+export type VisualResponseType = z.infer<typeof VisualResponseSchema>;
+

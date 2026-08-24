@@ -6,7 +6,8 @@ export type AiActionType =
   | 'AI_QUIZ'
   | 'AI_FLASHCARD'
   | 'AI_DOCUMENT_STUDY'
-  | 'AI_STUDY_PLAN';
+  | 'AI_STUDY_PLAN'
+  | 'AI_IMAGE_GEN';
 
 export const AI_LIMITS: Record<AiActionType, { limitPerHour: number; name: string }> = {
   AI_QUESTION: { limitPerHour: 10, name: 'Hỏi đáp AI' },
@@ -15,6 +16,7 @@ export const AI_LIMITS: Record<AiActionType, { limitPerHour: number; name: strin
   AI_FLASHCARD: { limitPerHour: 5, name: 'Tạo Flashcard AI' },
   AI_DOCUMENT_STUDY: { limitPerHour: 3, name: 'Phân tích Tài liệu AI' },
   AI_STUDY_PLAN: { limitPerHour: 3, name: 'Lập Kế Hoạch Học Tập AI' },
+  AI_IMAGE_GEN: { limitPerHour: 5, name: 'Sinh Ảnh Minh Họa AI' },
 };
 
 export async function checkDbRateLimit(

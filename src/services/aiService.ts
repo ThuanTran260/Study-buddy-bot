@@ -10,12 +10,15 @@ import {
   QuizResponseSchema,
   FlashcardResponseSchema,
   StudyPackSchema,
+  VisualResponseSchema,
   QuizQuestionType as QuizQuestionData,
   FlashcardItemType as FlashcardItemData,
   StudyPackType as StudyPackData,
+  VisualResponseType as VisualResponseData,
+  VisualResponseType,
 } from '../utils/aiSchema';
 
-export { QuizQuestionData, FlashcardItemData, StudyPackData };
+export { QuizQuestionData, FlashcardItemData, StudyPackData, VisualResponseData };
 export const extractValidJson = stripMarkdownJson;
 
 const BASE_SYSTEM_PROMPT = `Bạn là Study Buddy — trợ lý học tập thông minh cho sinh viên.
@@ -185,4 +188,48 @@ export async function generateStudyPlanAI(studyDataContext: string): Promise<str
     userMessage: `Dưới đây là dữ liệu học tập 14 ngày qua của tôi:\n\n${studyDataContext}\n\nHãy lập kế hoạch học tập 7 ngày tiếp theo giúp tôi đạt kết quả tốt nhất!`,
     maxTokens: 1200,
   });
+}
+
+export async function askAIWithVisualRouter(
+  userQuestion: string,
+  history: ConversationMessage[] = []
+): Promise<VisualResponseType> {
+  const visualPrompt = `${BASE_SYSTEM_PROMPT}
+4. Bạn là trợ lý học tập đa phương tiện. Hãy phân tích câu hỏi của sinh viên và trả lời chi tiết.
+5. Nếu câu hỏi yêu cầu hoặc rất cần thiết có sơ đồ (lưu đồ thuật toán, kiến trúc hệ thống, quy trình, mindmap), hãy đặt hasVisual = true, visualType = "mermaid", và visualPromptOrCode là mã Mermaid hợp lệ (bắt đầu bằng flowchart TD, sequenceDiagram, classDiagram, v.v.).
+6. Nếu câu hỏi yêu cầu vẽ tranh, hình ảnh minh họa trừu tượng/sinh học/lịch sử, hãy đặt hasVisual = true, visualType = "image", và visualPromptOrCode là prompt tiếng Anh ngắn gọn mô tả hình cần vẽ.
+7. Nếu chỉ cần trả lời văn bản thông thường, đặt hasVisual = false.
+8. Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc:
+{
+  "textAnswer": "Nội dung giải thích chi tiết bằng tiếng Việt...",
+  "hasVisual": true,
+  "visualType": "mermaid",
+  "visualPromptOrCode": "flowchart TD\\n  A[Start] --> B[End]"
+}`;
+
+  try {
+    const rawResponse = await callAI({
+      systemPrompt: visualPrompt,
+      userMessage: userQuestion,
+      history,
+      maxTokens: 1500,
+      jsonMode: true,
+    });
+
+    const parsed = safeParseAIJson(rawResponse, VisualResponseSchema) as VisualResponseType | null;
+    if (parsed) {
+      return parsed;
+    }
+  } catch (error) {
+    logger.warn('Failed to call AI with visual router, falling back to standard text', {
+      error: String(error),
+    });
+  }
+
+  // Fallback về text thuần nếu parse JSON không thành công
+  const fallbackText = await askAIWithContext(userQuestion, history);
+  return {
+    textAnswer: fallbackText,
+    hasVisual: false,
+  };
 }

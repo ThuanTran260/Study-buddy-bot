@@ -1,5 +1,15 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
-import { askAIWithContext } from '../services/aiService';
+import {
+  SlashCommandBuilder,
+  ChatInputCommandInteraction,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  AttachmentBuilder,
+} from 'discord.js';
+import { askAIWithVisualRouter } from '../services/aiService';
+import { renderMermaidToBuffer } from '../services/visualService';
+import { aiImageQueue } from '../workers/imageWorker';
 import {
   getConversationHistory,
   addToConversation,
@@ -13,7 +23,7 @@ import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
   .setName('hoi')
-  .setDescription('Hỏi trợ lý AI học tập (tự động ghi nhớ ngữ cảnh hội thoại)')
+  .setDescription('Hỏi trợ lý AI học tập (tự động vẽ sơ đồ / ảnh minh họa & ghi nhớ ngữ cảnh)')
   .addStringOption((opt) =>
     opt.setName('cau_hoi').setDescription('Nội dung câu hỏi của bạn').setRequired(true).setMaxLength(1000)
   )
@@ -26,8 +36,6 @@ export const data = new SlashCommandBuilder()
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
-  const isNewTopic = interaction.options.getBoolean('moi') ?? false;
-
   const userQuestion = interaction.options.getString('cau_hoi', true);
   const isNew = interaction.options.getBoolean('moi') ?? false;
 
@@ -50,13 +58,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await interaction.deferReply();
 
   try {
-    // 🧠 Lấy lịch sử hội thoại trước đó (nếu có)
     const history = await getConversationHistory(discordUserId);
 
-    // Gọi AI với ngữ cảnh đa lượt
-    const answer = await askAIWithContext(userQuestion, history);
+    // 🧠 Gọi AI với Multi-Modal Visual Router
+    const aiResult = await askAIWithVisualRouter(userQuestion, history);
+    const answer = aiResult.textAnswer;
 
-    // Lưu câu hỏi và câu trả lời vào bộ nhớ ngắn hạn
+    // Lưu vào bộ nhớ ngữ cảnh Redis
     await addToConversation(discordUserId, 'user', userQuestion);
     await addToConversation(discordUserId, 'model', answer);
 
@@ -77,7 +85,67 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: `${contextStatus} • Hỏi bởi ${interaction.user.username}` })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
+    // 📊 XỬ LÝ SƠ ĐỒ MERMAID TỰ ĐỘNG
+    if (aiResult.hasVisual && aiResult.visualType === 'mermaid' && aiResult.visualPromptOrCode) {
+      const mermaidBuffer = await renderMermaidToBuffer(aiResult.visualPromptOrCode);
+
+      if (mermaidBuffer) {
+        const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.png' });
+        embed.setImage('attachment://diagram.png');
+        await interaction.editReply({
+          embeds: [embed],
+          files: [attachment],
+          allowedMentions: { parse: [] },
+        });
+      } else {
+        // 🛡️ Multi-tier fallback về Markdown Codeblock nếu QuickChart timeout
+        const fallbackDesc = `${embedChunk}\n\n📊 **Sơ đồ học tập:**\n\`\`\`mermaid\n${aiResult.visualPromptOrCode}\n\`\`\``;
+        embed.setDescription(fallbackDesc.slice(0, 4096));
+        await interaction.editReply({
+          embeds: [embed],
+          allowedMentions: { parse: [] },
+        });
+      }
+    }
+    // 🎨 XỬ LÝ SINH ẢNH IMAGEN 3 DƯỚI NỀN QUA BULLMQ
+    else if (aiResult.hasVisual && aiResult.visualType === 'image' && aiResult.visualPromptOrCode) {
+      const imageLimit = await checkDbRateLimit(user.id, 'AI_IMAGE_GEN');
+      if (imageLimit.allowed) {
+        embed.setFooter({
+          text: `${contextStatus} • 🎨 Đang tạo ảnh minh họa chi tiết dưới nền...`,
+        });
+
+        await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
+
+        // Đẩy vào BullMQ Background Queue
+        await aiImageQueue.add('generate-image', {
+          userId: user.id,
+          prompt: aiResult.visualPromptOrCode,
+          originalQuestion: userQuestion,
+          originalAnswer: answer,
+          webhookToken: interaction.token,
+          applicationId: interaction.client.user.id,
+        });
+      } else {
+        await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
+      }
+    }
+    // 🔘 CÂU HỎI THÔNG THƯỜNG -> ĐÍNH KÈM NÚT TẠO MINH HỌA THEO YÊU CẦU
+    else {
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`btn_visual_${interaction.id}_${discordUserId}`)
+          .setLabel('🎨 Tạo Sơ đồ / Ảnh minh họa')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('✨')
+      );
+
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row],
+        allowedMentions: { parse: [] },
+      });
+    }
 
     for (const chunk of followUpChunks) {
       await interaction.followUp({ content: chunk, allowedMentions: { parse: [] } });
