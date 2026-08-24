@@ -1,4 +1,9 @@
-import { renderMermaidToBuffer, generateAiIllustration, extractMermaidCode } from '../../src/services/visualService';
+import {
+  renderMermaidToBuffer,
+  generateAiIllustration,
+  extractMermaidCode,
+  sanitizeMermaidCode,
+} from '../../src/services/visualService';
 
 describe('visualService', () => {
   const originalFetch = global.fetch;
@@ -25,6 +30,24 @@ describe('visualService', () => {
     it('returns null when text contains no mermaid syntax', () => {
       const text = 'Chỉ là câu trả lời văn bản thông thường không có sơ đồ.';
       expect(extractMermaidCode(text)).toBeNull();
+    });
+  });
+
+  describe('sanitizeMermaidCode (Auto-Healer)', () => {
+    it('auto-heals invalid sequenceDiagram keywords like database, queue to participant', () => {
+      const dirtyCode = `sequenceDiagram
+    autonumber
+    actor Client as Client (Trình duyệt/App)
+    participant Server as API Server
+    database DB as Database
+    queue Q as Event Queue
+    Client->>Server: Login`;
+
+      const healed = sanitizeMermaidCode(dirtyCode);
+      expect(healed).not.toContain('database DB as Database');
+      expect(healed).not.toContain('queue Q as Event Queue');
+      expect(healed).toContain('participant DB as Database');
+      expect(healed).toContain('participant Q as Event Queue');
     });
   });
 

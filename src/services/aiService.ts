@@ -196,7 +196,7 @@ export async function askAIWithVisualRouter(
 ): Promise<VisualResponseType> {
   const visualPrompt = `${BASE_SYSTEM_PROMPT}
 4. Bạn là trợ lý học tập đa phương tiện. Hãy phân tích câu hỏi của sinh viên và trả lời chi tiết.
-5. Nếu câu hỏi yêu cầu hoặc rất cần thiết có sơ đồ (lưu đồ thuật toán, kiến trúc hệ thống, quy trình, mindmap), hãy đặt hasVisual = true, visualType = "mermaid", và visualPromptOrCode là mã Mermaid hợp lệ (bắt đầu bằng flowchart TD, sequenceDiagram, classDiagram, v.v.).
+5. Nếu câu hỏi yêu cầu hoặc rất cần thiết có sơ đồ (lưu đồ thuật toán, kiến trúc hệ thống, quy trình, mindmap), hãy đặt hasVisual = true, visualType = "mermaid", và visualPromptOrCode là mã Mermaid hợp lệ (bắt đầu bằng flowchart TD, sequenceDiagram, classDiagram, v.v.). QUY TẮC MERMAID: Trong sequenceDiagram, CHỈ ĐƯỢC DÙNG 'actor' và 'participant' (TUYỆT ĐỐI KHÔNG DÙNG 'database', 'queue', 'control' vì Mermaid sequenceDiagram chuẩn không hỗ trợ).
 6. Nếu câu hỏi yêu cầu vẽ tranh, hình ảnh minh họa trừu tượng/sinh học/lịch sử, hãy đặt hasVisual = true, visualType = "image", và visualPromptOrCode là prompt tiếng Anh ngắn gọn mô tả hình cần vẽ.
 7. Nếu chỉ cần trả lời văn bản thông thường, đặt hasVisual = false.
 8. Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc:

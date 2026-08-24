@@ -55,15 +55,35 @@ export function extractMermaidCode(text: string): string | null {
 }
 
 /**
+ * 🛡️ MERMAID AUTO-HEALER & SYNTAX SANITIZER
+ * Tự động chuẩn hóa và sửa các lỗi cú pháp do AI ảo giác trước khi render:
+ * - Thay thế các từ khóa sai trong sequenceDiagram (database, queue, control, boundary, entity, collections) thành participant
+ * - Sửa các thẻ HTML lạ hoặc ký tự đặc biệt gây crash parser
+ */
+export function sanitizeMermaidCode(rawCode: string): string {
+  let code = rawCode
+    .replace(/^```mermaid\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  if (!code) return '';
+
+  // 1. Tự động vá Sequence Diagram syntax
+  if (code.includes('sequenceDiagram')) {
+    code = code
+      .replace(/^\s*(database|queue|control|boundary|entity|collections)\s+/gmi, '    participant ');
+  }
+
+  return code;
+}
+
+/**
  * Gửi mã Mermaid tới Mermaid.ink (chuẩn Pako Deflate) để render thành Buffer ảnh PNG/JPEG.
  * Hỗ trợ 100% tiếng Việt UTF-8 và các sơ đồ Sequence phức tạp.
  * Nếu timeout (>5s) hoặc lỗi cú pháp, trả về null để kích hoạt Fallback Markdown.
  */
 export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer | null> {
-  const cleanedCode = mermaidCode
-    .replace(/^```mermaid\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
+  const cleanedCode = sanitizeMermaidCode(mermaidCode);
 
   if (!cleanedCode) return null;
 
