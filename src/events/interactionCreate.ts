@@ -117,9 +117,22 @@ export async function execute(interaction: Interaction): Promise<void> {
           const mermaidBuffer = await renderMermaidToBuffer(mermaidCode);
 
           if (mermaidBuffer) {
-            const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.png' });
+            const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.jpg' });
+            
+            let cleanedDescription = originalText
+              .replace(/```mermaid[\s\S]*?```/gi, '')
+              .replace(/sequenceDiagram[\s\S]+/i, '')
+              .replace(/flowchart[\s\S]+/i, '')
+              .replace(/📊\s*Sơ đồ học tập\s*:?/gi, '')
+              .trim();
+
+            if (!cleanedDescription) {
+              cleanedDescription = 'Dưới đây là sơ đồ trực quan được tự động vẽ cho câu hỏi của bạn:';
+            }
+
             const updatedEmbed = EmbedBuilder.from(originalEmbed)
-              .setImage('attachment://diagram.png');
+              .setDescription(cleanedDescription.slice(0, 4096))
+              .setImage('attachment://diagram.jpg');
 
             await interaction.update({
               embeds: [updatedEmbed],

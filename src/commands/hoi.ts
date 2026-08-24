@@ -95,15 +95,31 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const mermaidBuffer = await renderMermaidToBuffer(detectedMermaidCode);
 
       if (mermaidBuffer) {
-        const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.png' });
-        embed.setImage('attachment://diagram.png');
+        logger.info('Đã render thành công sơ đồ Mermaid thành ảnh JPEG đính kèm');
+        const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.jpg' });
+        
+        // 🧹 Làm sạch khối code thô trong mô tả để chỉ hiển thị lời giải thích + Ảnh sơ đồ sắc nét
+        let cleanedDescription = embedChunk
+          .replace(/```mermaid[\s\S]*?```/gi, '')
+          .replace(/sequenceDiagram[\s\S]+/i, '')
+          .replace(/flowchart[\s\S]+/i, '')
+          .replace(/📊\s*Sơ đồ học tập\s*:?/gi, '')
+          .trim();
+
+        if (!cleanedDescription) {
+          cleanedDescription = 'Dưới đây là sơ đồ trực quan được tự động vẽ cho câu hỏi của bạn:';
+        }
+
+        embed.setDescription(cleanedDescription.slice(0, 4096));
+        embed.setImage('attachment://diagram.jpg');
+
         await interaction.editReply({
           embeds: [embed],
           files: [attachment],
           allowedMentions: { parse: [] },
         });
       } else {
-        // 🛡️ Multi-tier fallback về Markdown Codeblock nếu QuickChart timeout
+        // 🛡️ Multi-tier fallback về Markdown Codeblock nếu render lỗi
         const fallbackDesc = answer.includes('```mermaid')
           ? embedChunk
           : `${embedChunk}\n\n📊 **Sơ đồ học tập:**\n\`\`\`mermaid\n${detectedMermaidCode}\n\`\`\``;
