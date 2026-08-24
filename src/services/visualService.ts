@@ -1,3 +1,4 @@
+import zlib from 'zlib';
 import OpenAI from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import { env } from '../config/env';
@@ -6,7 +7,7 @@ import { logger } from '../utils/logger';
 const openaiClient = env.aiApiKey ? new OpenAI({ apiKey: env.aiApiKey }) : null;
 const geminiClient = env.aiApiKey ? new GoogleGenAI({ apiKey: env.aiApiKey }) : null;
 
-const MERMAID_TIMEOUT_MS = 3000;
+const MERMAID_TIMEOUT_MS = 5000;
 const MAX_IMAGE_BUFFER_BYTES = 2 * 1024 * 1024; // 2MB memory bound
 
 /**
@@ -41,7 +42,6 @@ export function extractMermaidCode(text: string): string | null {
   for (const kw of keywords) {
     const idx = text.indexOf(kw);
     if (idx !== -1) {
-      // Cắt từ từ khóa đến hết khối hoặc đến dấu backtick
       let candidate = text.slice(idx);
       const endBacktick = candidate.indexOf('```');
       if (endBacktick !== -1) {
@@ -55,9 +55,9 @@ export function extractMermaidCode(text: string): string | null {
 }
 
 /**
- * Gửi mã Mermaid tới QuickChart (qua POST) để render thành Buffer ảnh PNG.
- * Sử dụng POST để chống lỗi URL Too Long với các sơ đồ Sequence/Flowchart phức tạp.
- * Nếu timeout (>3s) hoặc lỗi, trả về null để kích hoạt cơ chế Fallback Markdown.
+ * Gửi mã Mermaid tới Mermaid.ink (chuẩn Pako Deflate) để render thành Buffer ảnh PNG/JPEG.
+ * Hỗ trợ 100% tiếng Việt UTF-8 và các sơ đồ Sequence phức tạp.
+ * Nếu timeout (>5s) hoặc lỗi cú pháp, trả về null để kích hoạt Fallback Markdown.
  */
 export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer | null> {
   const cleanedCode = mermaidCode
@@ -71,20 +71,18 @@ export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer
   const timeoutId = setTimeout(() => controller.abort(), MERMAID_TIMEOUT_MS);
 
   try {
-    const response = await fetch('https://quickchart.io/mermaid', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        mermaid: cleanedCode,
-        width: 1024,
-      }),
+    const state = JSON.stringify({ code: cleanedCode, mermaid: { theme: 'default' } });
+    const deflated = zlib.deflateSync(Buffer.from(state, 'utf8'), { level: 9 });
+    const pakoBase64 = deflated.toString('base64url');
+    const url = `https://mermaid.ink/img/pako:${pakoBase64}?bgColor=white`;
+
+    const response = await fetch(url, {
+      method: 'GET',
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      logger.warn('QuickChart returned non-200 status', { status: response.status });
+      logger.warn('Mermaid.ink returned non-200 status', { status: response.status });
       return null;
     }
 
@@ -98,7 +96,7 @@ export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer
 
     return buffer;
   } catch (error: any) {
-    logger.warn('QuickChart Mermaid render failed or timed out, falling back to Markdown', {
+    logger.warn('Mermaid.ink render failed or timed out, falling back to Markdown', {
       error: error.message || String(error),
     });
     return null;

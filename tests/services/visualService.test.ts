@@ -29,7 +29,7 @@ describe('visualService', () => {
   });
 
   describe('renderMermaidToBuffer', () => {
-    it('returns Buffer when QuickChart responds with 200 OK via POST', async () => {
+    it('returns Buffer when Mermaid.ink responds with 200 OK', async () => {
       const mockPngBuffer = Buffer.from('fake-png-binary-data');
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
@@ -40,15 +40,14 @@ describe('visualService', () => {
       expect(result).not.toBeNull();
       expect(Buffer.isBuffer(result)).toBe(true);
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://quickchart.io/mermaid',
+        expect.stringContaining('https://mermaid.ink/img/pako:'),
         expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ mermaid: 'flowchart TD\n  A --> B', width: 1024 }),
+          method: 'GET',
         })
       );
     });
 
-    it('cleans markdown wrappers before calling QuickChart', async () => {
+    it('cleans markdown wrappers before calling Mermaid.ink', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('png').buffer,
@@ -56,15 +55,12 @@ describe('visualService', () => {
 
       await renderMermaidToBuffer('```mermaid\nflowchart LR\n  Start --> Stop\n```');
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://quickchart.io/mermaid',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ mermaid: 'flowchart LR\n  Start --> Stop', width: 1024 }),
-        })
+        expect.stringContaining('https://mermaid.ink/img/pako:'),
+        expect.any(Object)
       );
     });
 
-    it('returns null when QuickChart returns non-200 status', async () => {
+    it('returns null when Mermaid.ink returns non-200 status', async () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: false,
         status: 500,
