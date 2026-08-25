@@ -1,0 +1,10 @@
+
+
+
+   Đây là tài liệu học tập có nhiều khoảng trắng    và dòng trống lộn xộn   
+	   nhưng nội dung thực vẫn tồn tại sau khi trim.
+   
+   
+Phải được pipeline chấp nhận vì khoảng trắng thừa không làm hỏng văn bản.   
+
+
