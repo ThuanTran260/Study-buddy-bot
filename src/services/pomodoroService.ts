@@ -88,11 +88,16 @@ export async function safeSetVoiceStatus(channel: VoiceChannel, status: string |
       return false;
     })();
 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('VOICE_STATUS_TIMEOUT')), 2500)
-    );
+    let timeoutId: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('VOICE_STATUS_TIMEOUT')), 2500);
+    });
 
-    await Promise.race([updatePromise, timeoutPromise]);
+    try {
+      await Promise.race([updatePromise, timeoutPromise]);
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
     return true;
   } catch (error) {
     logger.warn('Failed to update voice channel status (non-critical)', { channelId: channel.id, status, error: String(error) });
