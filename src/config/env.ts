@@ -10,6 +10,10 @@ const rawEnvSchema = z.object({
   AI_PROVIDER: z.enum(['openai', 'anthropic', 'gemini']).default('openai'),
   AI_API_KEY: z.string().min(1, 'AI_API_KEY is required'),
   AI_MODEL: z.string().default('gpt-4o-mini'),
+  IMAGE_GEN_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
   PORT: z.coerce.number().optional(),
   HEALTH_PORT: z.coerce.number().optional(),
 });
@@ -23,6 +27,7 @@ export const envSchema = rawEnvSchema.transform((data) => ({
   aiProvider: data.AI_PROVIDER,
   aiApiKey: data.AI_API_KEY,
   aiModel: data.AI_MODEL,
+  imageGenEnabled: data.IMAGE_GEN_ENABLED,
   healthPort: data.PORT || data.HEALTH_PORT || 3000,
 }));
 
@@ -46,6 +51,7 @@ export const env = process.env.NODE_ENV === 'test'
       aiProvider: 'openai' as const,
       aiApiKey: process.env.AI_API_KEY || 'mock_ai_key',
       aiModel: 'gpt-4o-mini',
+      imageGenEnabled: false,
       healthPort: 3000,
     } as Env)
   : parseEnv(process.env as Record<string, unknown>);

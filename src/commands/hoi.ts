@@ -17,6 +17,7 @@ import {
   getConversationMessageCount,
 } from '../services/conversationMemory';
 import { splitForEmbedAndFollowUp } from '../utils/messageSplitter';
+import { env } from '../config/env';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
@@ -130,8 +131,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         });
       }
     }
-    // 🎨 XỬ LÝ SINH ẢNH IMAGEN 3 DƯỚI NỀN QUA BULLMQ
-    else if (aiResult.hasVisual && aiResult.visualType === 'image' && aiResult.visualPromptOrCode) {
+    // 🎨 XỬ LÝ SINH ẢNH DƯỚI NỀN QUA BULLMQ (chỉ khi IMAGE_GEN_ENABLED=true)
+    else if (env.imageGenEnabled && aiResult.hasVisual && aiResult.visualType === 'image' && aiResult.visualPromptOrCode) {
       const imageLimit = await checkDbRateLimit(user.id, 'AI_IMAGE_GEN');
       if (imageLimit.allowed) {
         embed.setFooter({
@@ -153,19 +154,24 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
       }
     }
-    // 🔘 CÂU HỎI THÔNG THƯỜNG -> ĐÍNH KÈM NÚT TẠO MINH HỌA THEO YÊU CẦU
+    // 🔘 CÂU HỎI THÔNG THƯỜNG -> NÚT TẠO MINH HỌA (chỉ khi IMAGE_GEN_ENABLED=true)
     else {
-      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-          .setCustomId(`btn_visual_${interaction.id}_${discordUserId}`)
-          .setLabel('🎨 Tạo Sơ đồ / Ảnh minh họa')
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji('✨')
-      );
+      const components: ActionRowBuilder<ButtonBuilder>[] = [];
+      if (env.imageGenEnabled) {
+        components.push(
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`btn_visual_${interaction.id}_${discordUserId}`)
+              .setLabel('🎨 Tạo Sơ đồ / Ảnh minh họa')
+              .setStyle(ButtonStyle.Secondary)
+              .setEmoji('✨')
+          )
+        );
+      }
 
       await interaction.editReply({
         embeds: [embed],
-        components: [row],
+        components,
         allowedMentions: { parse: [] },
       });
     }

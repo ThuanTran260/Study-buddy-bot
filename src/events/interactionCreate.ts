@@ -1,5 +1,6 @@
 import { Events, Interaction, ChatInputCommandInteraction, AutocompleteInteraction } from 'discord.js';
 import { prisma } from '../config/prisma';
+import { env } from '../config/env';
 import { logger } from '../utils/logger';
 import * as hoiCommand from '../commands/hoi';
 import * as tomtatCommand from '../commands/tomtat';
@@ -69,6 +70,13 @@ export async function execute(interaction: Interaction): Promise<void> {
 
     // 🎨 XỬ LÝ NÚT BẤM SINH ẢNH / SƠ ĐỒ MINH HỌA (btn_visual_...)
     if (interaction.customId.startsWith('btn_visual_')) {
+      if (!env.imageGenEnabled) {
+        await interaction.reply({
+          content: '⚠️ Tính năng tạo ảnh minh họa hiện đang tắt. Câu trả lời của bot là dạng văn bản thuần.',
+          ephemeral: true,
+        });
+        return;
+      }
       const parts = interaction.customId.split('_');
       const originalUserId = parts[parts.length - 1];
 
