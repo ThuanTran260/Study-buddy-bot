@@ -6,7 +6,7 @@
 [![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E.svg)](https://supabase.com/)
 [![Google Gemini](https://img.shields.io/badge/AI-Gemini_3.5_Flash-orange.svg)](https://aistudio.google.com/)
-[![Tests](https://img.shields.io/badge/Tests-38_Passed_100%25-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-157_Passed_100%25-success.svg)]()
 
 > **Study Buddy 2.0** là một hệ sinh thái học tập toàn diện trên Discord dành cho sinh viên: Tích hợp **AI sinh nội dung (Google Gemini 3.5 Flash)**, **Thuật toán Spaced Repetition SuperMemo-2 (SM-2)**, **Gamification nuôi chuỗi Streak 🔥**, **Phòng học Voice Pomodoro tự động**, và **Hệ thống Quản trị Đa Server (Multi-Tenant SaaS)**.
 
@@ -59,7 +59,7 @@ $$\text{Khoảng cách ngày ôn: } I(n) = \begin{cases} 1 & \text{khi } n = 1 \
 4. **Timezone Resilience (`Asia/Ho_Chi_Minh`)**: Chuẩn hóa ngày lịch `YYYY-MM-DD` bằng `Intl.DateTimeFormat` $\rightarrow$ Chống gãy Streak khi học đêm muộn.
 5. **Mention Exploit Protection**: Sanitizer lọc `@everyone`, `@here` và cờ API `allowedMentions: { parse: [] }`.
 6. **Multi-Tenancy Guild Isolation**: Cấu hình động độc lập theo từng server Discord.
-7. **Test-Driven Development (TDD)**: 13/13 Test Suites, 38/38 Unit Tests đạt tỷ lệ `PASS 100%`.
+7. **Test-Driven Development (TDD)**: 29/29 Test Suites, 157/157 Unit Tests đạt tỷ lệ `PASS 100%`.
 
 ---
 
@@ -67,13 +67,14 @@ $$\text{Khoảng cách ngày ôn: } I(n) = \begin{cases} 1 & \text{khi } n = 1 \
 
 ### 1. Yêu cầu môi trường
 * Node.js ≥ 20.0.0 LTS
+* pnpm (bật bằng `corepack enable` — phiên bản được pin qua `"packageManager"` trong package.json)
 * PostgreSQL (Supabase Cloud hoặc Docker local)
 
 ### 2. Cài đặt mã nguồn
 ```bash
 git clone https://github.com/ThuanTran260/Study-buddy-bot.git
 cd "Bot Discord"
-npm install
+pnpm install
 ```
 
 ### 3. Cấu hình biến môi trường (`.env`)
@@ -93,14 +94,14 @@ HEALTH_PORT=3000
 
 ### 4. Đồng bộ CSDL & Đăng ký Lệnh
 ```bash
-npx prisma db push
-npm run deploy:commands
+pnpm exec prisma db push
+pnpm run deploy:commands
 ```
 
 ### 5. Chạy Kiểm Thử & Khởi Động
 ```bash
-npm test         # Chạy 38 unit tests
-npm run dev      # Khởi động bot ở môi trường phát triển
+pnpm test        # Chạy 157 unit tests (29 test suites)
+pnpm dev         # Khởi động bot ở môi trường phát triển
 ```
 
 ---
@@ -108,24 +109,39 @@ npm run dev      # Khởi động bot ở môi trường phát triển
 ## 🧪 Kết Quả Kiểm Thử (Jest Test Results)
 
 ```text
-PASS tests/services/sm2Service.test.ts
-PASS tests/services/aiService.test.ts
-PASS tests/utils/messageSplitter.test.ts
-PASS tests/services/quizService.test.ts
-PASS tests/utils/rateLimiter.test.ts
-PASS tests/utils/sanitize.test.ts
-PASS tests/services/pomodoroService.test.ts
-PASS tests/utils/dateUtils.test.ts
 PASS tests/config/env.test.ts
-PASS tests/prisma/schema.test.ts
-PASS tests/services/cleanupService.test.ts
+PASS tests/utils/logger.test.ts
+PASS tests/utils/dateUtils.test.ts
+PASS tests/utils/aiSchema.test.ts
+PASS tests/utils/rateLimiter.test.ts
+PASS tests/utils/messageSplitter.test.ts
+PASS tests/utils/sanitize.test.ts
+PASS tests/services/visualService.test.ts
 PASS tests/services/streakService.test.ts
+PASS tests/services/sm2Service.test.ts
+PASS tests/services/quizService.test.ts
+PASS tests/services/pomodoroService.test.ts
+PASS tests/services/documentService.test.ts
 PASS tests/services/dbRateLimiter.test.ts
+PASS tests/services/dailyReminderService.test.ts
+PASS tests/services/conversationMemory.test.ts
+PASS tests/services/cleanupService.test.ts
+PASS tests/services/aiService.test.ts
+PASS tests/commands/studyPlan.test.ts
+PASS tests/commands/leaderboard.test.ts
+PASS tests/commands/group.test.ts
+PASS tests/prisma/schema.test.ts
+PASS tests/simulations/edgeCaseSimulator.test.ts
+PASS tests/simulations/databaseEdgeCases.test.ts
+PASS tests/simulations/clientEdgeCaseSimulator.test.ts
+PASS tests/simulations/adversarialAttackSimulator.test.ts
+PASS tests/simulations/userJourneySimulator.test.ts
+PASS tests/simulations/flashcardAutocomplete.test.ts
+PASS tests/simulations/visualEdgeCases.test.ts
 
-Test Suites: 13 passed, 13 total
-Tests:       38 passed, 38 total
+Test Suites: 29 passed, 29 total
+Tests:       157 passed, 157 total
 Snapshots:   0 total
-Time:        18.705 s
 ```
 
 ---

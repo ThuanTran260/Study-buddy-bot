@@ -1,24 +1,23 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN apk add --no-cache openssl libc6-compat
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 RUN apk add --no-cache curl openssl libc6-compat
-COPY package*.json ./
-COPY prisma ./prisma
-RUN npm ci --omit=dev --ignore-scripts
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-
+RUN corepack enable
 ENV NODE_ENV=production
 EXPOSE 3000 10000
+COPY package.json pnpm-lock.yaml ./
+COPY prisma ./prisma
+RUN pnpm install --frozen-lockfile --prod
+COPY --from=builder /app/dist ./dist
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD curl -f http://localhost:${PORT:-3000}/health || exit 1
