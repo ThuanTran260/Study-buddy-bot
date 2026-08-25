@@ -64,12 +64,6 @@ export async function getAllPomodoroStates(): Promise<PomodoroState[]> {
 }
 
 /**
- * Đặt hoặc xóa ghi chú trạng thái (Voice Channel Status) cho kênh thoại mà không làm đổi tên kênh gốc.
- * Có cơ chế Timeout 2.5s để tuyệt đối không làm treo luồng phản hồi của bot.
- * @param channel Kênh voice của Discord
- * @param status Chuỗi trạng thái hiển thị (để null hoặc rỗng "" để xóa trạng thái)
- */
-/**
  * Chiến lược thử gọi các API đặt Voice Status có sẵn trên kênh tới (feature-detect).
  * Hỗ trợ 2 tên method khả dọc của discord.js mà không cần ép kiểu.
  */
@@ -78,6 +72,12 @@ interface VoiceStatusCapableChannel {
   sendVoiceStatus?: (status: string) => unknown;
 }
 
+/**
+ * Đặt hoặc xóa ghi chú trạng thái (Voice Channel Status) cho kênh thoại mà không làm đổi tên kênh gốc.
+ * Có cơ chế Timeout 2.5s để tuyệt đối không làm treo luồng phản hồi của bot.
+ * @param channel Kênh voice của Discord
+ * @param status Chuỗi trạng thái hiển thị (để null hoặc rỗng "" để xóa trạng thái)
+ */
 export async function safeSetVoiceStatus(channel: VoiceChannel, status: string | null): Promise<boolean> {
   const statusStr = status ?? '';
   try {
