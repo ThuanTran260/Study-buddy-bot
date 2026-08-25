@@ -10,10 +10,24 @@ const ALLOWED_EXTENSIONS = ['.txt', '.md', '.json', '.csv'];
 const FETCH_TIMEOUT_MS = 10_000;
 
 // 🛡️ Prompt-injection heuristics: chặn các mẫu câu cố gắng override instructions / lộ system prompt
+// Chuẩn hóa trước khi check: gỡ zero-width/format chars (\p{Cf}) để chống obfuscation
+function normalizeForInjectionCheck(text: string): string {
+  return text
+    .normalize('NFC')
+    .replace(/\p{Cf}/gu, ' ')
+    .replace(/\s+/g, ' ');
+}
+
 const PROMPT_INJECTION_PATTERNS: RegExp[] = [
+  // English: override-instruction attempts
   /ignore\s+(all\s+|any\s+|the\s+)?(previous\s+|prior\s+)?instructions/i,
-  /reveal\s+(your\s+|the\s+)?(hidden\s+)?system\s+prompt/i,
-  /output\s+(your\s+|the\s+)?(hidden\s+)?system\s+prompt/i,
+  /(disregard|forget)\s+(all\s+|any\s+|the\s+)?(previous\s+|prior\s+)?instructions/i,
+  // English: exfiltrate system prompt
+  /(reveal|output|show|print)\s+(your\s+|the\s+)?(hidden\s+)?system\s+prompt/i,
+  // Vietnamese: override-instruction
+  /bỏ\s+qua\s+(mọi|toàn\s+bộ|tất\s+cả|những)?\s*(hướng\s+dẫn|chỉ\s+thị|chỉ\s+dẫn|yêu\s+cầu)\s+trước/i,
+  // Vietnamese: exfiltrate system prompt
+  /(tiết\s+lộ|hé\s+lộ|in\s+ra|xuất)\s+(system\s+prompt|prompt\s+hệ\s+thống)/i,
 ];
 
 export interface ExtractedDocumentResult {
@@ -79,7 +93,8 @@ export async function extractDocumentContent(
   }
 
   // 🛡️ Chặn prompt-injection trước khi nội dung được đưa vào LLM prompt
-  if (PROMPT_INJECTION_PATTERNS.some((pattern) => pattern.test(rawText))) {
+  const normalizedText = normalizeForInjectionCheck(rawText);
+  if (PROMPT_INJECTION_PATTERNS.some((pattern) => pattern.test(normalizedText))) {
     throw new Error('PROMPT_INJECTION_DETECTED');
   }
 
