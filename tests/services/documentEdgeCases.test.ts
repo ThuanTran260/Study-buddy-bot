@@ -28,11 +28,10 @@ describe.each(fixtures)('document pipeline vs $name', ({ name, kind, content }) 
   } else {
     it('từ chối có kiểm soát bằng Error', async () => {
       const expected = EXPECTED_REJECT_ERRORS[name];
-      if (expected) {
-        await expect(extractDocumentContent(content, null, null, null)).rejects.toThrow(expected);
-      } else {
-        await expect(extractDocumentContent(content, null, null, null)).rejects.toThrow(Error);
+      if (!expected) {
+        throw new Error(`Unmapped reject fixture: ${name}`);
       }
+      await expect(extractDocumentContent(content, null, null, null)).rejects.toThrow(expected);
     });
   }
 });
