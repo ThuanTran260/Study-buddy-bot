@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { logger } from './logger';
 
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
 // ----------------------------------------------------
 // QUIZ SCHEMA
 // ----------------------------------------------------
@@ -18,39 +21,45 @@ export const QuizQuestionSchema = z.object({
 });
 
 export const QuizResponseSchema = z.preprocess(
-  (val: any) => {
+  (val: unknown) => {
     if (!val) return val;
-    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && !val[0].question ? val[0] : val;
-    const rawQuestions = Array.isArray(root) ? root : root.questions || root.quiz || root.test || root.quizzes || [];
-    
+    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && !(val[0] as { question?: unknown }).question ? val[0] : val;
+    const rootRec = root as Record<string, unknown>;
+    const rawQuestions = Array.isArray(root) ? root : rootRec.questions || rootRec.quiz || rootRec.test || rootRec.quizzes || [];
+
     if (!Array.isArray(rawQuestions)) return { questions: [] };
 
     const labels = ['A', 'B', 'C', 'D'];
     const validOptionsSet = new Set(labels);
 
-    const questions = rawQuestions.map((q: any) => {
+    const questions = rawQuestions.map((q: unknown) => {
       if (!q || typeof q !== 'object') return q;
-      const questionText = (q.question || q.cauHoi || q.prompt || '').toString().trim();
-      
+      const rec = q as Record<string, unknown>;
+      const questionText = String(rec.question || rec.cauHoi || rec.prompt || '').trim();
+
       let options: { label: string; text: string }[] = [];
-      if (Array.isArray(q.options)) {
-        if (q.options.length >= 2 && typeof q.options[0] === 'object' && q.options[0] !== null) {
-          options = q.options.map((o: any, idx: number) => ({
-            label: (o.label || labels[idx] || 'A').toString().toUpperCase().trim().charAt(0),
-            text: (o.text || o.content || o.value || '').toString().trim(),
-          }));
-        } else if (q.options.length >= 2 && typeof q.options[0] === 'string') {
-          options = q.options.map((optText: string, idx: number) => ({
+      if (Array.isArray(rec.options)) {
+        if (rec.options.length >= 2 && typeof rec.options[0] === 'object' && rec.options[0] !== null) {
+          options = rec.options.map((o: unknown, idx: number) => {
+            const opt = o as Record<string, unknown>;
+            return {
+              label: String(opt.label || labels[idx] || 'A').toUpperCase().trim().charAt(0),
+              text: String(opt.text || opt.content || opt.value || '').trim(),
+            };
+          });
+        } else if (rec.options.length >= 2 && typeof rec.options[0] === 'string') {
+          options = rec.options.map((optText: string, idx: number) => ({
             label: labels[idx] || 'A',
             text: optText.replace(/^[A-D][\.\:\)\-]\s*/i, '').trim(),
           }));
         }
-      } else if (typeof q.options === 'object' && q.options !== null) {
+      } else if (typeof rec.options === 'object' && rec.options !== null) {
+        const optObj = rec.options as Record<string, unknown>;
         for (let i = 0; i < labels.length; i++) {
           const l = labels[i];
-          const optVal = q.options[l] || q.options[l.toLowerCase()];
+          const optVal = optObj[l] || optObj[l.toLowerCase()];
           if (optVal) {
-            options.push({ label: l, text: optVal.toString().trim() });
+            options.push({ label: l, text: String(optVal).trim() });
           }
         }
       }
@@ -64,7 +73,7 @@ export const QuizResponseSchema = z.preprocess(
       }
 
       let correctOption = 'A';
-      const rawCorrect = (q.correctOption || q.answer || q.correct || q.dapAn || 'A').toString().trim();
+      const rawCorrect = String(rec.correctOption || rec.answer || rec.correct || rec.dapAn || 'A').trim();
       const firstChar = rawCorrect.toUpperCase().charAt(0);
       if (validOptionsSet.has(firstChar)) {
         correctOption = firstChar;
@@ -77,7 +86,7 @@ export const QuizResponseSchema = z.preprocess(
         }
       }
 
-      const explanation = (q.explanation || q.reason || q.giaiThich || 'Đáp án chính xác theo tài liệu bài học.').toString().trim();
+      const explanation = String(rec.explanation || rec.reason || rec.giaiThich || 'Đáp án chính xác theo tài liệu bài học.').trim();
 
       return {
         question: questionText,
@@ -106,17 +115,19 @@ export const FlashcardItemSchema = z.object({
 });
 
 export const FlashcardResponseSchema = z.preprocess(
-  (val: any) => {
+  (val: unknown) => {
     if (!val) return val;
-    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && !val[0].front ? val[0] : val;
-    const rawCards = Array.isArray(root) ? root : root.flashcards || root.cards || root.vocabulary || root.items || [];
-    
+    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && !(val[0] as { front?: unknown }).front ? val[0] : val;
+    const rootRec = root as Record<string, unknown>;
+    const rawCards = Array.isArray(root) ? root : rootRec.flashcards || rootRec.cards || rootRec.vocabulary || rootRec.items || [];
+
     if (!Array.isArray(rawCards)) return { flashcards: [] };
 
-    const flashcards = rawCards.map((c: any) => {
+    const flashcards = rawCards.map((c: unknown) => {
       if (!c || typeof c !== 'object') return c;
-      const front = (c.front || c.term || c.question || c.concept || c.key || '').toString().trim();
-      const back = (c.back || c.definition || c.answer || c.meaning || c.explanation || c.value || '').toString().trim();
+      const card = c as Record<string, unknown>;
+      const front = String(card.front || card.term || card.question || card.concept || card.key || '').trim();
+      const back = String(card.back || card.definition || card.answer || card.meaning || card.explanation || card.value || '').trim();
       return { front, back };
     });
 
@@ -134,19 +145,19 @@ export type FlashcardItemType = z.infer<typeof FlashcardItemSchema>;
 // ----------------------------------------------------
 
 export const StudyPackSchema = z.preprocess(
-  (val: any) => {
+  (val: unknown) => {
     if (!val || typeof val !== 'object') return val;
 
-    let root = val;
+    let root = val as Record<string, unknown>;
     if (Array.isArray(root) && root.length > 0 && typeof root[0] === 'object') {
-      root = root[0];
+      root = root[0] as Record<string, unknown>;
     }
     if (root.studyPack && typeof root.studyPack === 'object') {
-      root = root.studyPack;
+      root = root.studyPack as Record<string, unknown>;
     } else if (root.data && typeof root.data === 'object') {
-      root = root.data;
+      root = root.data as Record<string, unknown>;
     } else if (root.result && typeof root.result === 'object') {
-      root = root.result;
+      root = root.result as Record<string, unknown>;
     }
 
     // 1. Summary
@@ -164,7 +175,7 @@ export const StudyPackSchema = z.preprocess(
       summary = rawSummary.trim();
     } else if (Array.isArray(rawSummary)) {
       summary = rawSummary
-        .map((s: any) => (typeof s === 'string' ? s : JSON.stringify(s)))
+        .map((s: unknown) => (typeof s === 'string' ? s : JSON.stringify(s)))
         .join('\n')
         .trim();
     }
@@ -184,9 +195,9 @@ export const StudyPackSchema = z.preprocess(
 
     const flashcards: { front: string; back: string }[] = [];
     for (const c of rawCards) {
-      if (!c || typeof c !== 'object') continue;
-      const front = (c.front || c.term || c.question || c.concept || c.key || '').toString().trim();
-      const back = (c.back || c.definition || c.answer || c.meaning || c.explanation || c.value || '').toString().trim();
+      if (!isRecord(c)) continue;
+      const front = String(c.front || c.term || c.question || c.concept || c.key || '').trim();
+      const back = String(c.back || c.definition || c.answer || c.meaning || c.explanation || c.value || '').trim();
       if (front && back) {
         flashcards.push({
           front: front.slice(0, 1000),
@@ -206,23 +217,26 @@ export const StudyPackSchema = z.preprocess(
       ? root.quizzes
       : [];
 
-    const quiz: any[] = [];
+    const quiz: Record<string, unknown>[] = [];
     const labels = ['A', 'B', 'C', 'D'];
     const validOptionsSet = new Set(labels);
 
     for (const q of rawQuiz) {
-      if (!q || typeof q !== 'object') continue;
-      const questionText = (q.question || q.cauHoi || q.prompt || '').toString().trim();
+      if (!isRecord(q)) continue;
+      const questionText = String(q.question || q.cauHoi || q.prompt || '').trim();
       if (!questionText) continue;
 
       let options: { label: string; text: string }[] = [];
 
       if (Array.isArray(q.options)) {
         if (q.options.length >= 2 && typeof q.options[0] === 'object' && q.options[0] !== null) {
-          options = q.options.map((o: any, idx: number) => ({
-            label: (o.label || labels[idx] || 'A').toString().toUpperCase().trim().charAt(0),
-            text: (o.text || o.content || o.value || '').toString().trim(),
-          }));
+          options = q.options.map((o: unknown, idx: number) => {
+            const opt = o as Record<string, unknown>;
+            return {
+              label: String(opt.label || labels[idx] || 'A').toUpperCase().trim().charAt(0),
+              text: String(opt.text || opt.content || opt.value || '').trim(),
+            };
+          });
         } else if (q.options.length >= 2 && typeof q.options[0] === 'string') {
           options = q.options.map((optText: string, idx: number) => ({
             label: labels[idx] || 'A',
@@ -230,13 +244,14 @@ export const StudyPackSchema = z.preprocess(
           }));
         }
       } else if (typeof q.options === 'object' && q.options !== null) {
+        const optObj = q.options as Record<string, unknown>;
         for (let i = 0; i < labels.length; i++) {
           const l = labels[i];
-          const optVal = q.options[l] || q.options[l.toLowerCase()];
+          const optVal = optObj[l] || optObj[l.toLowerCase()];
           if (optVal) {
             options.push({
               label: l,
-              text: optVal.toString().trim(),
+              text: String(optVal).trim(),
             });
           }
         }
@@ -251,7 +266,7 @@ export const StudyPackSchema = z.preprocess(
       }
 
       let correctOption = 'A';
-      const rawCorrect = (q.correctOption || q.answer || q.correct || q.dapAn || 'A').toString().trim();
+      const rawCorrect = String(q.correctOption || q.answer || q.correct || q.dapAn || 'A').trim();
       const firstChar = rawCorrect.toUpperCase().charAt(0);
       if (validOptionsSet.has(firstChar)) {
         correctOption = firstChar;
@@ -264,7 +279,7 @@ export const StudyPackSchema = z.preprocess(
         }
       }
 
-      const explanation = (q.explanation || q.reason || q.giaiThich || 'Đáp án chính xác theo tài liệu bài học.').toString().trim();
+      const explanation = String(q.explanation || q.reason || q.giaiThich || 'Đáp án chính xác theo tài liệu bài học.').trim();
 
       if (options.length === 4) {
         quiz.push({
@@ -282,10 +297,12 @@ export const StudyPackSchema = z.preprocess(
 
     if (flashcards.length === 0 && quiz.length > 0) {
       for (const q of quiz) {
-        const correctText = q.options.find((o: any) => o.label === q.correctOption)?.text || q.explanation;
+        const correctText =
+          (q.options as { label?: unknown; text?: unknown }[]).find((o) => o.label === q.correctOption)?.text ||
+          q.explanation;
         flashcards.push({
-          front: q.question,
-          back: correctText,
+          front: q.question as string,
+          back: correctText as string,
         });
       }
     }
@@ -367,23 +384,23 @@ export const extractValidJson = stripMarkdownJson;
  * Hàm bọc chung để parse và validate an toàn
  */
 export function safeParseAIJson<T>(
-  raw: string, 
+  raw: string,
   schema: z.ZodType<T>
 ): T | null {
   try {
     const stripped = stripMarkdownJson(raw);
     const parsedObj = JSON.parse(stripped);
-    
+
     // Validate bằng Zod
     const result = schema.safeParse(parsedObj);
     if (!result.success) {
-      logger.warn('Zod validation failed for AI JSON', { 
-        errors: result.error.errors, 
-        rawPreview: raw.slice(0, 150) 
+      logger.warn('Zod validation failed for AI JSON', {
+        errors: result.error.errors,
+        rawPreview: raw.slice(0, 150)
       });
       return null;
     }
-    
+
     return result.data;
   } catch (error) {
     logger.warn('Failed to parse AI raw JSON', { error: String(error), rawPreview: raw.slice(0, 150) });
@@ -396,9 +413,12 @@ export function safeParseAIJson<T>(
 // ----------------------------------------------------
 
 export const VisualResponseSchema = z.preprocess(
-  (val: any) => {
+  (val: unknown) => {
     if (!val || typeof val !== 'object') return val;
-    const root = Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' ? val[0] : val;
+    let root = val as Record<string, unknown>;
+    if (Array.isArray(root) && root.length > 0 && typeof root[0] === 'object') {
+      root = root[0] as Record<string, unknown>;
+    }
 
     const textAnswer = root.textAnswer || root.answer || root.text || root.explanation || root.content || '';
     const hasVisual = Boolean(
@@ -413,8 +433,8 @@ export const VisualResponseSchema = z.preprocess(
       root.visualType === 'image' ||
       root.visualType === 'illustration'
     );
-    const visualType = root.visualType === 'mermaid' || root.visualType === 'diagram' 
-      ? 'mermaid' 
+    const visualType = root.visualType === 'mermaid' || root.visualType === 'diagram'
+      ? 'mermaid'
       : root.visualType === 'image' || root.visualType === 'illustration'
       ? 'image'
       : undefined;
@@ -437,4 +457,3 @@ export const VisualResponseSchema = z.preprocess(
 );
 
 export type VisualResponseType = z.infer<typeof VisualResponseSchema>;
-
