@@ -155,6 +155,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       userFriendlyMsg = '⚠️ Dung lượng file quá lớn. Vui lòng chọn file dưới 1MB.';
     } else if (errorMsg === 'FETCH_TIMEOUT') {
       userFriendlyMsg = '⏱️ Tải file từ Discord bị quá thời gian chờ. Vui lòng thử lại sau.';
+    } else if (errorMsg === 'PROMPT_INJECTION_DETECTED') {
+      userFriendlyMsg = '🛡️ Tài liệu chứa nội dung cố gắng can thiệp vào AI (prompt injection). Vui lòng gửi nội dung học tập thuần túy.';
     }
 
     await interaction.editReply({ content: userFriendlyMsg });

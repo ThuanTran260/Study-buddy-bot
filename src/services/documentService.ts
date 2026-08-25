@@ -9,6 +9,13 @@ const MAX_DOCUMENT_CHARS = 12_000;
 const ALLOWED_EXTENSIONS = ['.txt', '.md', '.json', '.csv'];
 const FETCH_TIMEOUT_MS = 10_000;
 
+// 🛡️ Prompt-injection heuristics: chặn các mẫu câu cố gắng override instructions / lộ system prompt
+const PROMPT_INJECTION_PATTERNS: RegExp[] = [
+  /ignore\s+(all\s+|any\s+|the\s+)?(previous\s+|prior\s+)?instructions/i,
+  /reveal\s+(your\s+|the\s+)?(hidden\s+)?system\s+prompt/i,
+  /output\s+(your\s+|the\s+)?(hidden\s+)?system\s+prompt/i,
+];
+
 export interface ExtractedDocumentResult {
   text: string;
   truncated: boolean;
@@ -69,6 +76,11 @@ export async function extractDocumentContent(
   // 🛡️ Kiểm tra chống file nhị phân giả mạo / null bytes
   if (!isPrintableText(rawText)) {
     throw new Error('INVALID_BINARY_CONTENT');
+  }
+
+  // 🛡️ Chặn prompt-injection trước khi nội dung được đưa vào LLM prompt
+  if (PROMPT_INJECTION_PATTERNS.some((pattern) => pattern.test(rawText))) {
+    throw new Error('PROMPT_INJECTION_DETECTED');
   }
 
   if (rawText.trim().length < 50) {
