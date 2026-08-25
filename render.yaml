@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     region: singapore # Chọn khu vực gần Việt Nam nhất để giảm latency
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:

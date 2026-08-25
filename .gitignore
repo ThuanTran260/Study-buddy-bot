@@ -1,5 +1,6 @@
 # Dependencies & Package Managers
 node_modules/
+package-lock.json
 package-lock.json.backup
 
 # Production Build Output
@@ -37,3 +38,4 @@ Thumbs.db
 .agents/
 .gemini/
 prompt.md
+For testing/
