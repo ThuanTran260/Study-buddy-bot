@@ -1,4 +1,4 @@
-import { Events, Interaction } from 'discord.js';
+import { Events, Interaction, ChatInputCommandInteraction, AutocompleteInteraction } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
 import * as hoiCommand from '../commands/hoi';
@@ -15,7 +15,12 @@ import * as tailieuCommand from '../commands/tailieu';
 import * as studyPlanCommand from '../commands/study-plan';
 import * as groupCommand from '../commands/group';
 
-const commands = new Map<string, any>([
+interface CommandModule {
+  autocomplete?: (interaction: AutocompleteInteraction) => Promise<void>;
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
+}
+
+const commands = new Map<string, CommandModule>([
   ['hoi', hoiCommand],
   ['tomtat', tomtatCommand],
   ['pomodoro', pomodoroCommand],

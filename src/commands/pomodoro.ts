@@ -121,12 +121,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         if (nextStatus === PomodoroStatus.BREAK) {
           safeSetVoiceStatus(voiceChannel, `☕ Giờ nghỉ giải lao (${breakMins}m)`).catch(() => {});
           if (textChannel && 'send' in textChannel) {
-            await (textChannel as any).send({ content: `☕ Hết giờ học! Hãy nghỉ ngơi **${breakMins} phút** nhé.` }).catch(() => {});
+            await textChannel.send({ content: `☕ Hết giờ học! Hãy nghỉ ngơi **${breakMins} phút** nhé.` }).catch(() => {});
           }
         } else {
           safeSetVoiceStatus(voiceChannel, `🍅 Đang tập trung Pomodoro (${workMins}m)`).catch(() => {});
           if (textChannel && 'send' in textChannel) {
-            await (textChannel as any).send({ content: `🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${workMins} phút**.` });
+            await textChannel.send({ content: `🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${workMins} phút**.` });
           }
         }
         

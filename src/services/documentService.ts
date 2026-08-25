@@ -52,8 +52,8 @@ export async function extractDocumentContent(
         throw new Error('FETCH_FAILED');
       }
       rawText = await response.text();
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
         throw new Error('FETCH_TIMEOUT');
       }
       throw err;

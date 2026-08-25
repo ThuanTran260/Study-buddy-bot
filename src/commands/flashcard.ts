@@ -175,7 +175,7 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
  * 🧠 HÀM THỰC THI PHIÊN ÔN TẬP SM-2 TƯƠNG TÁC
  */
 async function startReviewSession(
-  interaction: ChatInputCommandInteraction | any,
+  interaction: ChatInputCommandInteraction,
   user: { id: string; discordUserId: string; username: string },
   deckName: string | null
 ): Promise<void> {

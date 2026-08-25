@@ -136,7 +136,7 @@ export async function generateAiIllustration(prompt: string): Promise<Buffer | n
   try {
     if (env.aiProvider === 'gemini' && geminiClient) {
       // Gọi Imagen 3 qua Google GenAI SDK
-      const response = await (geminiClient.models as any).generateImages({
+      const response = await geminiClient.models.generateImages({
         model: 'imagen-3.0-generate-002',
         prompt: `Educational study illustration: ${safePrompt}`,
         config: {

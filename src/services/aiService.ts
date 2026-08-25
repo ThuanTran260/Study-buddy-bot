@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ContentListUnion } from '@google/genai';
 import { env } from '../config/env';
 import { sanitizeDiscordOutput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
@@ -53,7 +53,7 @@ async function callAI({
     let answer = '';
 
     if (env.aiProvider === 'gemini' && geminiClient) {
-      let contents: any;
+      let contents: ContentListUnion;
       if (history.length > 0) {
         contents = [
           ...history.map((m) => ({
@@ -77,7 +77,7 @@ async function callAI({
       });
       answer = response.text || '';
     } else if (openaiClient) {
-      const messages: any[] = [{ role: 'system', content: systemPrompt }];
+      const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: 'system', content: systemPrompt }];
       for (const h of history) {
         messages.push({
           role: h.role === 'model' ? 'assistant' : 'user',
