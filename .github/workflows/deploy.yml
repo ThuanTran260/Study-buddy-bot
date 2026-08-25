@@ -21,7 +21,7 @@ jobs:
       - name: 🥡 Setup pnpm (from packageManager field)
         uses: pnpm/action-setup@v4
 
-      - name: 🟢 Setup Node.js 20
+      - name: 🟢 Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -36,8 +36,8 @@ jobs:
       - name: 🔍 TypeScript Strict Typecheck
         run: pnpm exec tsc --noEmit
 
-      - name: 🧪 Run Full Test Suite (29 Suites / 157 Tests)
-        run: pnpm test -- --coverage
+      - name: 🧪 Run Full Test Suite with Coverage
+        run: pnpm test --coverage
         env:
           NODE_ENV: test
           DISCORD_TOKEN: mock_token_for_ci
