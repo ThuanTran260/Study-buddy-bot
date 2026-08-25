@@ -8,6 +8,9 @@ import {
   ButtonStyle,
   StringSelectMenuBuilder,
   ComponentType,
+  ButtonInteraction,
+  Collection,
+  Snowflake,
 } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { calculateSM2 } from '../services/sm2Service';
@@ -238,14 +241,14 @@ async function startReviewSession(
 
       const collector = msg.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        filter: (i: any) => i.user.id === user.discordUserId,
+        filter: (i: ButtonInteraction) => i.user.id === user.discordUserId,
         time: 300_000, // 5 phút thời gian suy nghĩ
         max: 1,
       });
 
       let isFlipCollected = false;
 
-      collector.on('collect', async (btnInt: any) => {
+      collector.on('collect', async (btnInt: ButtonInteraction) => {
         if (btnInt.customId === 'sm2_flip') {
           // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
           await btnInt.deferUpdate().catch(() => {});
@@ -279,14 +282,14 @@ async function startReviewSession(
 
           const ratingCollector = ratingMsg.createMessageComponentCollector({
             componentType: ComponentType.Button,
-            filter: (i: any) => i.user.id === user.discordUserId,
+            filter: (i: ButtonInteraction) => i.user.id === user.discordUserId,
             time: 300_000, // 5 phút
             max: 1,
           });
 
           let isRatingCollected = false;
 
-          ratingCollector.on('collect', async (rateInt: any) => {
+          ratingCollector.on('collect', async (rateInt: ButtonInteraction) => {
             // 🛡️ PHẢN HỒI NGAY LẬP TỨC CHO DISCORD TRONG VÒNG < 50ms
             await rateInt.deferUpdate().catch(() => {});
             if (isRatingCollected) return;
@@ -335,7 +338,7 @@ async function startReviewSession(
             }
           });
 
-          ratingCollector.on('end', async (_: any, reason: string) => {
+          ratingCollector.on('end', async (_: Collection<Snowflake, ButtonInteraction>, reason: string) => {
             if (reason === 'time') {
               const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
                 rBtn1.setDisabled(true),
@@ -349,7 +352,7 @@ async function startReviewSession(
         }
       });
 
-      collector.on('end', async (_: any, reason: string) => {
+      collector.on('end', async (_: Collection<Snowflake, ButtonInteraction>, reason: string) => {
         if (reason === 'time') {
           const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
             flipButton.setDisabled(true).setLabel('⏱️ Hết thời gian suy nghĩ (5 phút)')
