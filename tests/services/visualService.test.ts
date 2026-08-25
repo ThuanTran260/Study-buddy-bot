@@ -107,9 +107,12 @@ describe('visualService', () => {
   });
 
   describe('generateAiIllustration', () => {
-    it('returns null for empty prompt', async () => {
+    it('returns EMPTY_PROMPT reason for empty prompt', async () => {
       const result = await generateAiIllustration('');
-      expect(result).toBeNull();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('EMPTY_PROMPT');
+      }
     });
   });
 });

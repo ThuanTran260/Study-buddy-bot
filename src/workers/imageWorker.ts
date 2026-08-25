@@ -40,18 +40,25 @@ export const aiImageWorker = new Worker<AiImageJobData>(
     });
 
     try {
-      const imageBuffer = await generateAiIllustration(prompt);
+      const result = await generateAiIllustration(prompt);
 
-      if (!imageBuffer) {
-        // Fallback an toàn nếu AI Safety Block hoặc lỗi
+      if (!result.ok) {
+        const reasonMessages: Record<string, string> = {
+          SAFETY_BLOCKED: 'AI từ chối yêu cầu này do bộ lọc an toàn.',
+          QUOTA_EXCEEDED: 'Hạn mức tạo ảnh tạm cạn (free tier) — vui lòng thử lại sau vài giờ.',
+          CONFIG_ERROR: 'Model tạo ảnh không khả dụng với API key hiện tại — cần kiểm tra cấu hình.',
+          EMPTY_PROMPT: 'Yêu cầu tạo ảnh trống.',
+          GENERATION_FAILED: 'AI tạm thời lỗi hoặc quá tải — vui lòng thử lại.',
+        };
+        const reasonText = reasonMessages[result.reason] ?? reasonMessages.GENERATION_FAILED;
         await webhookClient.editMessage('@original', {
-          content: `⚠️ **Không thể tạo ảnh minh họa**: Yêu cầu bị bộ lọc an toàn từ chối hoặc AI quá tải. Dưới đây là câu trả lời văn bản:\n\n${originalAnswer}`,
+          content: `⚠️ **Không thể tạo ảnh minh họa**: ${reasonText} Dưới đây là câu trả lời văn bản:\n\n${originalAnswer}`,
           components: [],
         });
         return;
       }
 
-      const attachment = new AttachmentBuilder(imageBuffer, { name: 'illustration.png' });
+      const attachment = new AttachmentBuilder(result.buffer, { name: 'illustration.png' });
 
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)

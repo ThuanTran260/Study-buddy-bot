@@ -126,35 +126,74 @@ export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer
 }
 
 /**
- * Tạo ảnh minh họa AI bằng Google Imagen 3 hoặc OpenAI DALL-E 3.
- * Trả về Buffer ảnh JPEG/PNG hoặc null nếu lỗi/safety block.
+ * Tạo ảnh minh họa AI bằng Gemini image models (generateContent) hoặc OpenAI DALL-E 3.
+ * Trả về kết quả phân loại lý do để worker hiển thị message chính xác.
  */
-export async function generateAiIllustration(prompt: string): Promise<Buffer | null> {
+export type IllustrationResult =
+  | { ok: true; buffer: Buffer }
+  | {
+      ok: false;
+      reason: 'EMPTY_PROMPT' | 'SAFETY_BLOCKED' | 'QUOTA_EXCEEDED' | 'CONFIG_ERROR' | 'GENERATION_FAILED';
+    };
+
+const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
+
+type IllustrationFailure = Extract<IllustrationResult, { ok: false }>;
+
+function classifyGenAiError(error: unknown): IllustrationFailure {
+  const status = (error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code;
+  if (status === 429) return { ok: false, reason: 'QUOTA_EXCEEDED' };
+  if (status === 403 || status === 404) return { ok: false, reason: 'CONFIG_ERROR' };
+  return { ok: false, reason: 'GENERATION_FAILED' };
+}
+
+export async function generateAiIllustration(prompt: string): Promise<IllustrationResult> {
   const safePrompt = prompt.slice(0, 1000).trim();
-  if (!safePrompt) return null;
+  if (!safePrompt) return { ok: false, reason: 'EMPTY_PROMPT' };
 
   try {
     if (env.aiProvider === 'gemini' && geminiClient) {
-      // Gọi Imagen 3 qua Google GenAI SDK
-      const response = await geminiClient.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt: `Educational study illustration: ${safePrompt}`,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '1:1',
-        },
-      });
+      const fullPrompt = `Educational study illustration: ${safePrompt}`;
+      for (const model of GEMINI_IMAGE_MODELS) {
+        try {
+          const response = await geminiClient.models.generateContent({
+            model,
+            contents: fullPrompt,
+            config: { responseModalities: ['IMAGE'] },
+          });
 
-      const base64Image = response?.generatedImages?.[0]?.image?.imageBytes;
-      if (base64Image) {
-        const buffer = Buffer.from(base64Image, 'base64');
-        if (buffer.byteLength <= MAX_IMAGE_BUFFER_BYTES) {
-          return buffer;
+          const blockReason = response?.promptFeedback?.blockReason;
+          const finishReason = response?.candidates?.[0]?.finishReason;
+          if (blockReason || finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
+            logger.warn('Illustration blocked by safety filter', { model, blockReason, finishReason });
+            return { ok: false, reason: 'SAFETY_BLOCKED' };
+          }
+
+          const parts = response?.candidates?.[0]?.content?.parts ?? [];
+          const base64Image = parts.find((p) => p.inlineData?.data)?.inlineData?.data;
+          if (base64Image) {
+            const buffer = Buffer.from(base64Image, 'base64');
+            if (buffer.byteLength <= MAX_IMAGE_BUFFER_BYTES) {
+              return { ok: true, buffer };
+            }
+            logger.warn('Illustration exceeds max buffer size', { model, size: buffer.byteLength });
+          }
+        } catch (error: unknown) {
+          const classified = classifyGenAiError(error);
+          logger.warn('Gemini image model attempt failed', {
+            model,
+            reason: classified.reason,
+            error: error instanceof Error && error.message ? error.message : String(error),
+          });
+          if (classified.reason === 'QUOTA_EXCEEDED' || classified.reason === 'CONFIG_ERROR') {
+            return classified;
+          }
         }
       }
-    } else if (openaiClient) {
-      // Gọi DALL-E qua OpenAI SDK
+      return { ok: false, reason: 'GENERATION_FAILED' };
+    }
+
+    if (openaiClient) {
       const response = await openaiClient.images.generate({
         model: 'dall-e-3',
         prompt: `Educational study illustration: ${safePrompt}`,
@@ -167,17 +206,18 @@ export async function generateAiIllustration(prompt: string): Promise<Buffer | n
       if (b64Json) {
         const buffer = Buffer.from(b64Json, 'base64');
         if (buffer.byteLength <= MAX_IMAGE_BUFFER_BYTES) {
-          return buffer;
+          return { ok: true, buffer };
         }
       }
+      return { ok: false, reason: 'GENERATION_FAILED' };
     }
 
-    return null;
+    return { ok: false, reason: 'CONFIG_ERROR' };
   } catch (error: unknown) {
     logger.error('Failed to generate AI illustration', {
       prompt: safePrompt.slice(0, 100),
       error: error instanceof Error && error.message ? error.message : String(error),
     });
-    return null;
+    return { ok: false, reason: 'GENERATION_FAILED' };
   }
 }
