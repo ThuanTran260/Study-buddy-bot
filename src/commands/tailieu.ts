@@ -138,8 +138,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: `Hàng đợi: AI Background Job Worker` });
 
     await interaction.editReply({ embeds: [pendingEmbed] });
-  } catch (error: any) {
-    const errorMsg = error.message || String(error);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error && error.message ? error.message : String(error);
     logger.error('Error executing /tailieu', { userId: user.id, error: errorMsg });
 
     let userFriendlyMsg = '❌ Có lỗi xảy ra khi trích xuất tài liệu.';

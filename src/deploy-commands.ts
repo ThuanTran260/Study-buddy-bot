@@ -43,8 +43,8 @@ const rest = new REST().setToken(env.discordToken);
       await rest.put(Routes.applicationCommands(env.clientId), { body: commands });
       console.log(`✅ Đã đăng ký thành công ${commands.length} Global Commands!`);
     }
-  } catch (error: any) {
-    if (error.code === 50001) {
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 50001) {
       console.error('\n❌ LỖI: DiscordAPIError[50001] — Missing Access (Thiếu quyền truy cập vào Server).');
       console.error('🔍 Nguyên nhân chính: Bot CHƯA ĐƯỢC MỜI vào Server hoặc được mời nhưng thiếu quyền "applications.commands".\n');
       console.error('👉 KHẮC PHỤC NGAY: Hãy mở đường link bên dưới trên trình duyệt để mời bot vào Server:');

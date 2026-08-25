@@ -115,9 +115,9 @@ export async function renderMermaidToBuffer(mermaidCode: string): Promise<Buffer
     }
 
     return buffer;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn('Mermaid.ink render failed or timed out, falling back to Markdown', {
-      error: error.message || String(error),
+      error: error instanceof Error && error.message ? error.message : String(error),
     });
     return null;
   } finally {
@@ -173,10 +173,10 @@ export async function generateAiIllustration(prompt: string): Promise<Buffer | n
     }
 
     return null;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Failed to generate AI illustration', {
       prompt: safePrompt.slice(0, 100),
-      error: error.message || String(error),
+      error: error instanceof Error && error.message ? error.message : String(error),
     });
     return null;
   }

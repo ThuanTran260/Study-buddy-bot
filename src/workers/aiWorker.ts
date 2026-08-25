@@ -96,10 +96,10 @@ export const aiDocumentWorker = new Worker<AiDocumentJobData>(
 
       await webhookClient.editMessage('@original', { content: '', embeds: [embed] });
       logger.info(`Job ${job.id} hoàn thành.`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`Job ${job.id} thất bại`, { error: String(error) });
       let userFriendlyMsg = '❌ Có lỗi xảy ra khi xử lý tài liệu học tập (Background Job).';
-      const errorMsg = error.message || String(error);
+      const errorMsg = error instanceof Error && error.message ? error.message : String(error);
 
       if (errorMsg === 'AI_TIMEOUT') {
         userFriendlyMsg = '⏱️ AI mất quá nhiều thời gian phản hồi. Vui lòng thử lại với tài liệu ngắn hơn.';

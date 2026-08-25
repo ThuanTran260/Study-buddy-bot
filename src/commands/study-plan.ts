@@ -176,7 +176,7 @@ ${flashcardSummary}
       .setTimestamp();
 
     await interaction.editReply({ embeds: [planEmbed] });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Error in /study-plan', { userId: user.id, error: String(error) });
     await interaction.editReply({
       content: '❌ Có lỗi xảy ra khi tạo kế hoạch học tập AI. Vui lòng thử lại sau ít phút.',

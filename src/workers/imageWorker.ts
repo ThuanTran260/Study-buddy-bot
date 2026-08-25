@@ -74,7 +74,7 @@ export const aiImageWorker = new Worker<AiImageJobData>(
       });
 
       logger.info(`Job Image ${job.id} hoàn thành thành công.`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(`Job Image ${job.id} thất bại`, { error: String(error) });
       await webhookClient.editMessage('@original', {
         content: `❌ Có lỗi xảy ra khi tạo ảnh minh họa. Dưới đây là câu trả lời văn bản:\n\n${originalAnswer}`,
