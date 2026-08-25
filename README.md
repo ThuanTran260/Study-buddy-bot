@@ -66,7 +66,7 @@ $$\text{Khoảng cách ngày ôn: } I(n) = \begin{cases} 1 & \text{khi } n = 1 \
 ## 🚀 Hướng Dẫn Cài Đặt & Chạy Cục Bộ
 
 ### 1. Yêu cầu môi trường
-* Node.js ≥ 20.0.0 LTS
+* Node.js ≥ 22.13 LTS (bắt buộc — pnpm 11 dùng module `node:sqlite` của Node 22)
 * pnpm (bật bằng `corepack enable` — phiên bản được pin qua `"packageManager"` trong package.json)
 * PostgreSQL (Supabase Cloud hoặc Docker local)
 
