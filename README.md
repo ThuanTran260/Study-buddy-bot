@@ -1,18 +1,19 @@
 # 📚 Study Buddy 2.0 — Enterprise-Grade Discord Learning Ecosystem
 
-[![Node.js](https://img.shields.io/badge/Node.js-20_LTS-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22_LTS-green.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2.svg)](https://discord.js.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748.svg)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E.svg)](https://supabase.com/)
 [![Google Gemini](https://img.shields.io/badge/AI-Gemini_3.5_Flash-orange.svg)](https://aistudio.google.com/)
 [![Tests](https://img.shields.io/badge/Tests-157_Passed_100%25-success.svg)]()
+[![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Study Buddy 2.0** là một hệ sinh thái học tập toàn diện trên Discord dành cho sinh viên: Tích hợp **AI sinh nội dung (Google Gemini 3.5 Flash)**, **Thuật toán Spaced Repetition SuperMemo-2 (SM-2)**, **Gamification nuôi chuỗi Streak 🔥**, **Phòng học Voice Pomodoro tự động**, và **Hệ thống Quản trị Đa Server (Multi-Tenant SaaS)**.
+> **Study Buddy 2.0** is an enterprise-grade academic collaboration ecosystem for Discord. It seamlessly integrates **Generative AI (Google Gemini 3.5 Flash)**, the **SuperMemo-2 (SM-2) Spaced Repetition Algorithm**, **Streak Gamification 🔥**, **Dynamic Pomodoro Voice Study Rooms**, and **Multi-Tenant Guild Administration**.
 
 ---
 
-## 🌟 9 Tính Năng Cốt Lõi (Core Features)
+## 🌟 9 Core Pillars
 
 ```
                                ┌──────────────────────────────────────────────┐
@@ -21,63 +22,65 @@
             ┌───────────────────┬─────────────────────┼────────────────────┬───────────────────┐
             ▼                   ▼                     ▼                    ▼                   ▼
     ┌───────────────┐   ┌───────────────┐     ┌───────────────┐    ┌───────────────┐   ┌───────────────┐
-    │ 🧠 AI Q&A     │   │ 🎯 AI Quiz    │     │ 🗂️ Flashcard  │    │ 🍅 Pomodoro   │   │ 📊 Profile &  │
-    │ & Tóm Tắt     │   │ Buttons       │     │ Thuật toán    │    │ & Auto Voice  │   │ Weekly Digest │
-    │ (/hoi,/tomtat)│   │ (/quiz)       │     │ SM-2 (Anki)   │    │ (/pomodoro)   │   │ (/profile)    │
+    │ 🧠 AI Q&A     │   │ 🎯 AI Quiz    │     │ 🗂️ Flashcards │    │ 🍅 Pomodoro   │   │ 📊 Profile &  │
+    │ & Summaries   │   │ Buttons       │     │ SuperMemo-2   │    │ & Auto Voice  │   │ Weekly Digest │
+    │ (/hoi,/tomtat)│   │ (/quiz)       │     │ Algorithm     │    │ (/pomodoro)   │   │ (/profile)    │
     └───────────────┘   └───────────────┘     └───────────────┘    └───────────────┘   └───────────────┘
 ```
 
-1. 🧠 **Hỏi Đáp AI (`/hoi`)**: Giải đáp mọi câu hỏi học thuật với Gemini 3.5 Flash, tự động cắt trang Embed chống tràn ký tự.
-2. 📝 **Tóm Tắt Bài Học (`/tomtat`)**: Nén tài liệu dài thành 3–5 điểm trọng tâm (bullet points).
-3. 🎯 **Trắc Nghiệm Tương Tác (`/quiz`)**: Bộ câu hỏi trắc nghiệm AI với **4 nút bấm A/B/C/D**, tự đếm ngược 30s, chấm điểm và xếp hạng (S/A/B/C/D).
-4. 🗂️ **Thẻ Nhớ Spaced Repetition (`/flashcard`)**: 
-   * `/flashcard deck-create` / `add`: Quản lý bộ thẻ nhớ cá nhân.
-   * `/flashcard ai-generate`: Dùng Gemini AI tự động soạn bộ thẻ song ngữ/chuyên ngành.
-   * `/flashcard review`: Giao diện lật thẻ tương tác `[👁️ Show Answer]` và 4 nút đánh giá `[Quên]` / `[Khó]` / `[Tốt]` / `[Rất Dễ]` tính toán ngày ôn tiếp theo qua **thuật toán SuperMemo-2 (SM-2)**.
-5. 🍅 **Phòng Học Pomodoro (`/pomodoro`)**: Tự động đổi tên kênh thoại theo chu kỳ Học (🍅) $\leftrightarrow$ Nghỉ (☕) chống Discord API 429.
-6. 🔊 **Hệ Thống Tạo Phòng Tự Động (Auto Study Room)**: Tự cấp phòng voice riêng khi vào kênh trigger, tự dọn sạch sau 8 giây khi phòng trống.
-7. 🔥 **Gamification & Hồ Sơ Cá Nhân (`/profile`)**: Bảng thành tích học tập tổng hợp: Chuỗi Streak liên tiếp 🔥, tỷ lệ đúng %, giờ Pomodoro và danh hiệu học thuật.
-8. 📊 **Báo Cáo Học Tập Tuần (`/digest`)**: Cron Job tự động gửi DM tổng kết tiến độ 7 ngày vào 20:00 tối Chủ Nhật hàng tuần (`Asia/Ho_Chi_Minh`).
-9. ⚙️ **Quản Trị Đa Server (`/config`, `/help`)**: Cấu hình kênh trigger voice, kênh log cảnh báo Admin, trần số phòng mở cùng lúc cho từng server.
+1. 🧠 **AI Academic Tutor (`/hoi`)**: Instant academic query resolution powered by Gemini 3.5 Flash with intelligent embed chunking preventing Discord character overflow.
+2. 📝 **Document Summarizer (`/tomtat`)**: Distills lengthy study materials into structured bullet points with high informational density.
+3. 🎯 **Interactive AI Quiz Machine (`/quiz`)**: Generates 4-option multiple-choice quizzes with **interactive ActionRow buttons (A/B/C/D)**, 30-second live timers, and automated grading tiers (S/A/B/C/D).
+4. 🗂️ **Spaced Repetition Flashcards (`/flashcard`)**: 
+   * `/flashcard deck-create` / `add`: Create and manage custom study decks.
+   * `/flashcard ai-generate`: Leverage Gemini AI to automatically generate bilingual or technical card sets.
+   * `/flashcard review`: Interactive card flip `[👁️ Show Answer]` with 4 recall rating buttons `[Forgot]` / `[Hard]` / `[Good]` / `[Easy]` scheduling reviews via the **SuperMemo-2 (SM-2)** algorithm.
+5. 🍅 **Automated Pomodoro Sessions (`/pomodoro`)**: Manages Focus (🍅) $\leftrightarrow$ Break (☕) cycles with automated Discord voice channel renaming throttled against API 429 rate limits.
+6. 🔊 **Dynamic Voice Room Provisioning (Auto Study Room)**: On-demand private voice channel creation triggered upon joining, with 8-second automated garbage collection when empty.
+7. 🔥 **Gamification & Academic Profiles (`/profile`)**: Dynamic badge and achievement system tracking continuous Study Streaks 🔥, quiz accuracy %, Pomodoro focus hours, and rank titles.
+8. 📊 **Weekly Progress Digest (`/digest`)**: Scheduled node-cron job delivering personalized 7-day performance analytics via DM every Sunday at 20:00 (`Asia/Ho_Chi_Minh`).
+9. ⚙️ **Multi-Tenant Guild Administration (`/config`, `/help`)**: Guild-scoped configuration for trigger voice channels, admin audit logging channels, and concurrent room limits.
 
 ---
 
-## 🧮 Thuật Toán SuperMemo-2 (SM-2 Algorithm)
+## 🧮 SuperMemo-2 (SM-2) Spaced Repetition Algorithm
 
-Thuật toán tính toán chu kỳ lặp lại ngắt quãng dựa trên độ nhớ $q \in \{1, 3, 4, 5\}$:
-$$\text{Ease Factor mới: } EF' = \max\left(1.3, \; EF + \left(0.1 - (5 - q) \times (0.08 + (5 - q) \times 0.02)\right)\right)$$
+Calculates optimal review intervals based on user recall grade $q \in \{1, 3, 4, 5\}$:
 
-$$\text{Khoảng cách ngày ôn: } I(n) = \begin{cases} 1 & \text{khi } n = 1 \\ 6 & \text{khi } n = 2 \\ \text{round}(I(n-1) \times EF') & \text{khi } n > 2 \text{ và } q \ge 3 \\ 1 & \text{khi } q < 3 \text{ (quên, reset chu kỳ)} \end{cases}$$
+$$\text{New Ease Factor: } EF' = \max\left(1.3, \; EF + \left(0.1 - (5 - q) \times (0.08 + (5 - q) \times 0.02)\right)\right)$$
 
----
-
-## 🛡️ Tầng Lớp Bảo Mật & Độ Bền Vững (7-Layer Security)
-
-1. **User-Centric Data Preservation**: `QuizSession` và `FlashcardDeck` liên kết với `Guild` qua `onDelete: SetNull` $\rightarrow$ Server bị xóa thì toàn bộ lịch sử học tập cá nhân vẫn được bảo toàn 100%.
-2. **DB-Backed Rate Limiter**: Giới hạn lượt gọi AI được lưu vào bảng `AiUsageLog` $\rightarrow$ Không bao giờ bị mất trạng thái khi máy chủ restart.
-3. **Data Retention & Auto Cleanup**: Cron job 03:00 sáng VN + Hook khởi động tự dọn dẹp các bản ghi log cũ hơn 24h $\rightarrow$ Giữ CSDL Supabase luôn siêu nhẹ (< 10MB).
-4. **Timezone Resilience (`Asia/Ho_Chi_Minh`)**: Chuẩn hóa ngày lịch `YYYY-MM-DD` bằng `Intl.DateTimeFormat` $\rightarrow$ Chống gãy Streak khi học đêm muộn.
-5. **Mention Exploit Protection**: Sanitizer lọc `@everyone`, `@here` và cờ API `allowedMentions: { parse: [] }`.
-6. **Multi-Tenancy Guild Isolation**: Cấu hình động độc lập theo từng server Discord.
-7. **Test-Driven Development (TDD)**: 29/29 Test Suites, 157/157 Unit Tests đạt tỷ lệ `PASS 100%`.
+$$\text{Review Interval: } I(n) = \begin{cases} 1 & \text{for } n = 1 \\ 6 & \text{for } n = 2 \\ \text{round}(I(n-1) \times EF') & \text{for } n > 2 \text{ and } q \ge 3 \\ 1 & \text{for } q < 3 \text{ (lapse, reset cycle)} \end{cases}$$
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy Cục Bộ
+## 🛡️ 7-Layer Resilience & Security Architecture
 
-### 1. Yêu cầu môi trường
-* Node.js ≥ 22.13 LTS (bắt buộc — pnpm 11 dùng module `node:sqlite` của Node 22)
-* pnpm (bật bằng `corepack enable` — phiên bản được pin qua `"packageManager"` trong package.json)
-* PostgreSQL (Supabase Cloud hoặc Docker local)
+1. **User-Centric Data Preservation**: `QuizSession` and `FlashcardDeck` maintain `Guild` relations with `onDelete: SetNull` $\rightarrow$ Server deletions never erase personal academic progress.
+2. **Database-Backed Rate Limiter**: AI rate limits persisted in `AiUsageLog` $\rightarrow$ Throttling state survives process crashes and server restarts.
+3. **Data Retention & Auto Cleanup**: Automated daily cron at 03:00 UTC+7 and startup hooks purge stale logs older than 24h $\rightarrow$ Maintains Supabase DB footprint under 10MB.
+4. **Timezone Resilience (`Asia/Ho_Chi_Minh`)**: Calendar dates standardized to `YYYY-MM-DD` via `Intl.DateTimeFormat` $\rightarrow$ Prevents late-night streak breakage.
+5. **Mention Exploit Protection**: Sanitizer strips `@everyone` and `@here`, complemented by API-level `allowedMentions: { parse: [] }`.
+6. **Multi-Tenancy Guild Isolation**: Dynamic guild-specific configurations isolated at the database query level.
+7. **Test-Driven Development (TDD)**: 29/29 Test Suites, 157/157 Unit Tests with 100% pass rate.
 
-### 2. Cài đặt mã nguồn
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+* **Node.js ≥ 22.13 LTS** (Required for native `node:sqlite` in pnpm 11)
+* **pnpm** (Enabled via `corepack enable`)
+* **PostgreSQL** (Supabase Cloud or Docker local)
+* **Discord Application & Bot Token** (From Discord Developer Portal)
+
+### 2. Installation
 ```bash
 git clone https://github.com/ThuanTran260/Study-buddy-bot.git
-cd "Bot Discord"
+cd "Study-buddy-bot"
 pnpm install
 ```
 
-### 3. Cấu hình biến môi trường (`.env`)
+### 3. Environment Configuration (`.env`)
 ```env
 DISCORD_TOKEN=your_bot_token
 CLIENT_ID=your_client_id
@@ -92,21 +95,21 @@ DIRECT_URL="postgresql://postgres.[ref]:[pass]@aws-0-ap-northeast-1.pooler.supab
 HEALTH_PORT=3000
 ```
 
-### 4. Đồng bộ CSDL & Đăng ký Lệnh
+### 4. Database Sync & Command Registration
 ```bash
 pnpm exec prisma db push
 pnpm run deploy:commands
 ```
 
-### 5. Chạy Kiểm Thử & Khởi Động
+### 5. Test Suite & Startup
 ```bash
-pnpm test        # Chạy 157 unit tests (29 test suites)
-pnpm dev         # Khởi động bot ở môi trường phát triển
+pnpm test        # Execute 157 unit tests across 29 test suites
+pnpm dev         # Launch bot in development mode with nodemon
 ```
 
 ---
 
-## 🧪 Kết Quả Kiểm Thử (Jest Test Results)
+## 🧪 Test Suite Results (Jest TDD Suite)
 
 ```text
 PASS tests/config/env.test.ts
@@ -142,7 +145,11 @@ PASS tests/simulations/visualEdgeCases.test.ts
 Test Suites: 29 passed, 29 total
 Tests:       157 passed, 157 total
 Snapshots:   0 total
+Time:        4.82s
 ```
 
 ---
-*Phát triển bởi Trần Thuận • Dự án Portfolio Kỹ Sư Phần Mềm (Study Buddy 2.0)*
+
+<div align="center">
+  <sub>Developed with ❤️ by Tran Thuan • Software Engineering Portfolio (Study Buddy 2.0)</sub>
+</div>
