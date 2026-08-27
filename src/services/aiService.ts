@@ -69,12 +69,12 @@ async function callAI({
       // 🛡️ MULTI-MODEL CASCADE: Tự động fallback qua các model dự phòng nếu model chính bị 503 (High Demand)
       const candidateModels = Array.from(
         new Set([
-          env.aiModel || 'gemini-3.6-flash',
           'gemini-3.6-flash',
+          env.aiModel,
           'gemini-3.5-flash',
           'gemini-3.5-flash-lite',
           'gemini-flash-latest',
-        ])
+        ].filter(Boolean) as string[])
       );
 
       let lastGeminiError: unknown = null;
@@ -223,16 +223,18 @@ export async function askAIWithVisualRouter(
   history: ConversationMessage[] = []
 ): Promise<VisualResponseType> {
   const visualPrompt = `${BASE_SYSTEM_PROMPT}
-4. Bạn là trợ lý học tập đa phương tiện. Hãy phân tích câu hỏi của sinh viên và trả lời chi tiết.
-5. Nếu câu hỏi yêu cầu hoặc rất cần thiết có sơ đồ (lưu đồ thuật toán, kiến trúc hệ thống, quy trình, mindmap), hãy đặt hasVisual = true, visualType = "mermaid", và visualPromptOrCode là mã Mermaid hợp lệ (bắt đầu bằng flowchart TD, sequenceDiagram, classDiagram, v.v.). QUY TẮC MERMAID: Trong sequenceDiagram, CHỈ ĐƯỢC DÙNG 'actor' và 'participant' (TUYỆT ĐỐI KHÔNG DÙNG 'database', 'queue', 'control' vì Mermaid sequenceDiagram chuẩn không hỗ trợ).
-6. Nếu câu hỏi yêu cầu vẽ tranh, hình ảnh minh họa trừu tượng/sinh học/lịch sử, hãy đặt hasVisual = true, visualType = "image", và visualPromptOrCode là prompt tiếng Anh ngắn gọn mô tả hình cần vẽ.
-7. Nếu chỉ cần trả lời văn bản thông thường, đặt hasVisual = false.
+4. Bạn là trợ lý học tập thông minh cho sinh viên. Hãy phân tích câu hỏi và giải thích chi tiết, mạch lạc, dễ hiểu bằng tiếng Việt.
+5. QUY TẮC MẶC ĐỊNH: Luôn trả lời bằng VĂN BẢN THUẦN (đặt hasVisual = false, không sinh sơ đồ).
+6. CHỈ KHI VÀ CHỈ KHI NGƯỜI DÙNG CÓ YÊU CẦU RÕ RÀNG VỀ SƠ ĐỒ / BIỂU ĐỒ / HÌNH ẢNH (chứa các từ khóa như: "vẽ sơ đồ", "tạo biểu đồ", "cho sơ đồ", "sơ đồ", "biểu đồ", "diagram", "flowchart", "sequence diagram", "lưu đồ", "vẽ hình", "minh họa ảnh"):
+   - Nếu là sơ đồ / kiến trúc / luồng dữ liệu / quy trình: Đặt hasVisual = true, visualType = "mermaid", và visualPromptOrCode là mã Mermaid hợp lệ (bắt đầu bằng flowchart TD, sequenceDiagram, classDiagram, v.v.). QUY TẮC MERMAID: Trong sequenceDiagram, CHỈ ĐƯỢC DÙNG 'actor' và 'participant' (TUYỆT ĐỐI KHÔNG DÙNG 'database', 'queue', 'control').
+   - Nếu là yêu cầu vẽ tranh / ảnh nghệ thuật / sinh học: Đặt hasVisual = true, visualType = "image", và visualPromptOrCode là prompt tiếng Anh ngắn gọn mô tả hình cần vẽ.
+7. NẾU NGƯỜI DÙNG KHÔNG YÊU CẦU SƠ ĐỒ HOẶC HÌNH ẢNH: TUYỆT ĐỐI KHÔNG TỰ Ý SINH SƠ ĐỒ, luôn đặt hasVisual = false.
 8. Trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc:
 {
   "textAnswer": "Nội dung giải thích chi tiết bằng tiếng Việt...",
-  "hasVisual": true,
-  "visualType": "mermaid",
-  "visualPromptOrCode": "flowchart TD\\n  A[Start] --> B[End]"
+  "hasVisual": false,
+  "visualType": null,
+  "visualPromptOrCode": null
 }`;
 
   try {

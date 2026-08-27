@@ -86,11 +86,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: `${contextStatus} • Hỏi bởi ${interaction.user.username}` })
       .setTimestamp();
 
-    // 📊 XỬ LÝ SƠ ĐỒ MERMAID TỰ ĐỘNG (Từ Structured Schema HOẶC Tự động bóc tách từ Text)
+    // 📊 XỬ LÝ SƠ ĐỒ MERMAID: CHỈ KHI NGƯỜI DÙNG CÓ YÊU CẦU SƠ ĐỒ (hasVisual = true)
     const detectedMermaidCode =
-      (aiResult.hasVisual && aiResult.visualType === 'mermaid' && aiResult.visualPromptOrCode)
+      aiResult.hasVisual && aiResult.visualType === 'mermaid' && aiResult.visualPromptOrCode
         ? aiResult.visualPromptOrCode
-        : extractMermaidCode(answer);
+        : null;
 
     if (detectedMermaidCode) {
       const mermaidBuffer = await renderMermaidToBuffer(detectedMermaidCode);
