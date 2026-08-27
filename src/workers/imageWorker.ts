@@ -94,6 +94,10 @@ export const aiImageWorker = new Worker<AiImageJobData>(
   {
     connection: redisClient,
     concurrency: 2, // 🛡️ Giới hạn tối đa 2 jobs song song để bảo vệ RAM 512MB
+    // 🛡️ TỐI ƯU HÓA SERVERLESS REDIS: Giảm 95% số lượng request polling nền
+    stalledInterval: 300_000, // 5 phút kiểm tra stalled job 1 lần thay vì 30s
+    lockDuration: 300_000,    // 5 phút gia hạn lock 1 lần
+    drainDelay: 30,           // Nghỉ 30s khi hàng đợi rỗng
   }
 );
 

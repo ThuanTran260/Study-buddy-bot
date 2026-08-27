@@ -44,23 +44,52 @@ export interface PomodoroState {
 }
 
 export const activeTimers = new Map<string, NodeJS.Timeout>();
+const localPomodoroFallback = new Map<string, PomodoroState>();
 
 export async function savePomodoroState(channelId: string, state: PomodoroState): Promise<void> {
-  await redisClient.hset(POMODORO_REDIS_KEY, channelId, JSON.stringify(state));
+  localPomodoroFallback.set(channelId, state);
+  try {
+    await redisClient.hset(POMODORO_REDIS_KEY, channelId, JSON.stringify(state));
+  } catch (err) {
+    logger.warn('Redis unavailable in savePomodoroState, saved to memory', {
+      channelId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export async function getPomodoroState(channelId: string): Promise<PomodoroState | null> {
-  const data = await redisClient.hget(POMODORO_REDIS_KEY, channelId);
-  return data ? JSON.parse(data) : null;
+  try {
+    const data = await redisClient.hget(POMODORO_REDIS_KEY, channelId);
+    if (data) return JSON.parse(data);
+    return localPomodoroFallback.get(channelId) || null;
+  } catch {
+    return localPomodoroFallback.get(channelId) || null;
+  }
 }
 
 export async function removePomodoroState(channelId: string): Promise<void> {
-  await redisClient.hdel(POMODORO_REDIS_KEY, channelId);
+  localPomodoroFallback.delete(channelId);
+  try {
+    await redisClient.hdel(POMODORO_REDIS_KEY, channelId);
+  } catch (err) {
+    logger.warn('Redis unavailable in removePomodoroState', {
+      channelId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 export async function getAllPomodoroStates(): Promise<PomodoroState[]> {
-  const data = await redisClient.hgetall(POMODORO_REDIS_KEY);
-  return Object.values(data).map((v) => JSON.parse(v));
+  try {
+    const data = await redisClient.hgetall(POMODORO_REDIS_KEY);
+    if (data && Object.keys(data).length > 0) {
+      return Object.values(data).map((v) => JSON.parse(v));
+    }
+    return Array.from(localPomodoroFallback.values());
+  } catch {
+    return Array.from(localPomodoroFallback.values());
+  }
 }
 
 /**

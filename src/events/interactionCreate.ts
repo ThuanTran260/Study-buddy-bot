@@ -92,8 +92,8 @@ export async function execute(interaction: Interaction): Promise<void> {
       const { redisClient } = await import('../config/redis');
       const lockKey = `visual_lock:${interaction.message.id}`;
 
-      // 2. Atomic Redis Lock: Chống click đúp và spam nhiều request
-      const acquired = await redisClient.set(lockKey, '1', 'EX', 60, 'NX');
+      // 2. Atomic Redis Lock: Chống click đúp và spam nhiều request (Bắt lỗi an toàn nếu Redis mất kết nối)
+      const acquired = await redisClient.set(lockKey, '1', 'EX', 60, 'NX').catch(() => 'OK');
       if (!acquired) {
         await interaction.reply({
           content: '⏳ Đang có một tiến trình tạo ảnh cho câu trả lời này rồi. Vui lòng chờ vài giây nhé!',

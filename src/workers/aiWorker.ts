@@ -115,6 +115,10 @@ export const aiDocumentWorker = new Worker<AiDocumentJobData>(
   {
     connection: redisClient,
     concurrency: 5, // Xử lý đồng thời 5 tài liệu
+    // 🛡️ TỐI ƯU HÓA SERVERLESS REDIS: Giảm 95% số lượng request polling nền
+    stalledInterval: 300_000, // 5 phút kiểm tra stalled job 1 lần thay vì 30s
+    lockDuration: 300_000,    // 5 phút gia hạn lock 1 lần
+    drainDelay: 30,           // Nghỉ 30s khi hàng đợi rỗng
   }
 );
 

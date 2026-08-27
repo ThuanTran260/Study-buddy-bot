@@ -80,3 +80,47 @@ describe('safeSetVoiceStatus', () => {
     expect(result).toBe(false);
   });
 });
+
+describe('Pomodoro Redis & In-Memory State Resilience', () => {
+  const {
+    savePomodoroState,
+    getPomodoroState,
+    removePomodoroState,
+    getAllPomodoroStates,
+  } = require('../../src/services/pomodoroService');
+
+  it('saves and retrieves state, falls back to memory when Redis fails', async () => {
+    const { redisClient } = await import('../../src/config/redis');
+
+    const sampleState = {
+      channelId: 'chan-1',
+      textChannelId: 'text-1',
+      workMins: 25,
+      breakMins: 5,
+      status: PomodoroStatus.WORK,
+      endsAt: Date.now() + 1500000,
+    };
+
+    // Khi Redis hoạt động
+    await savePomodoroState('chan-1', sampleState);
+    const retrieved = await getPomodoroState('chan-1');
+    expect(retrieved?.channelId).toBe('chan-1');
+
+    // Giả lập Redis ném lỗi Quota Exceeded
+    jest.spyOn(redisClient, 'hset').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+    jest.spyOn(redisClient, 'hget').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+    jest.spyOn(redisClient, 'hgetall').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+
+    // Vẫn lưu và đọc thành công từ In-Memory Store
+    await expect(savePomodoroState('chan-fallback', sampleState)).resolves.not.toThrow();
+    const fallbackRetrieved = await getPomodoroState('chan-fallback');
+    expect(fallbackRetrieved?.channelId).toBe('chan-1');
+
+    const all = await getAllPomodoroStates();
+    expect(all.length).toBeGreaterThan(0);
+
+    await removePomodoroState('chan-fallback');
+
+    jest.restoreAllMocks();
+  });
+});
