@@ -66,16 +66,44 @@ async function callAI({
         contents = userMessage;
       }
 
-      const response = await geminiClient.models.generateContent({
-        model: env.aiModel || 'gemini-3.5-flash',
-        contents,
-        config: {
-          systemInstruction: systemPrompt,
-          maxOutputTokens: Math.max(maxTokens, 2048),
-          responseMimeType: jsonMode ? 'application/json' : 'text/plain',
-        },
-      });
-      answer = response.text || '';
+      // 🛡️ MULTI-MODEL CASCADE: Tự động fallback qua các model dự phòng nếu model chính bị 503 (High Demand)
+      const candidateModels = Array.from(
+        new Set([
+          env.aiModel || 'gemini-3.6-flash',
+          'gemini-3.6-flash',
+          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-flash-latest',
+        ])
+      );
+
+      let lastGeminiError: unknown = null;
+      for (const candidateModel of candidateModels) {
+        try {
+          const response = await geminiClient.models.generateContent({
+            model: candidateModel,
+            contents,
+            config: {
+              systemInstruction: systemPrompt,
+              maxOutputTokens: Math.max(maxTokens, 2048),
+              responseMimeType: jsonMode ? 'application/json' : 'text/plain',
+            },
+          });
+          answer = response.text || '';
+          lastGeminiError = null;
+          break; // Thành công -> thoát vòng lặp
+        } catch (err: unknown) {
+          logger.warn(`Gemini model ${candidateModel} failed, trying next candidate in cascade`, {
+            candidateModel,
+            error: String(err),
+          });
+          lastGeminiError = err;
+        }
+      }
+
+      if (lastGeminiError) {
+        throw lastGeminiError;
+      }
     } else if (openaiClient) {
       const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: 'system', content: systemPrompt }];
       for (const h of history) {

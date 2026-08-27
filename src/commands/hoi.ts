@@ -141,15 +141,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
         await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
 
-        // Đẩy vào BullMQ Background Queue
-        await aiImageQueue.add('generate-image', {
-          userId: user.id,
-          prompt: aiResult.visualPromptOrCode,
-          originalQuestion: userQuestion,
-          originalAnswer: answer,
-          webhookToken: interaction.token,
-          applicationId: interaction.client.user.id,
-        });
+        // Đẩy vào BullMQ Background Queue (Bọc an toàn nếu Redis mất kết nối)
+        try {
+          await aiImageQueue.add('generate-image', {
+            userId: user.id,
+            prompt: aiResult.visualPromptOrCode,
+            originalQuestion: userQuestion,
+            originalAnswer: answer,
+            webhookToken: interaction.token,
+            applicationId: interaction.client.user.id,
+          });
+        } catch (queueErr) {
+          logger.warn('Failed to dispatch image job to BullMQ queue', { error: String(queueErr) });
+        }
       } else {
         await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
       }
