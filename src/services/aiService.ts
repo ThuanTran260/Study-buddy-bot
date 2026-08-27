@@ -33,6 +33,94 @@ const AI_TIMEOUT_MS = 120_000; // Tăng timeout lên 120s vì đã có BullMQ g�
 const openaiClient = env.aiApiKey ? new OpenAI({ apiKey: env.aiApiKey }) : null;
 const geminiClient = env.aiApiKey ? new GoogleGenAI({ apiKey: env.aiApiKey }) : null;
 
+export const GEMINI_DEFAULT_MODELS = [
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-latest',
+];
+
+export const OPENAI_DEFAULT_MODELS = [
+  'gpt-4o-mini',
+  'gpt-4o',
+  'gpt-3.5-turbo',
+];
+
+/**
+ * 🏷️ Trích xuất mã trạng thái HTTP từ error object của Google SDK, OpenAI SDK hoặc raw response
+ */
+export function extractHttpStatus(error: unknown): number | null {
+  if (typeof error === 'object' && error !== null) {
+    if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
+      return (error as { status: number }).status;
+    }
+    if ('code' in error && typeof (error as { code: unknown }).code === 'number') {
+      return (error as { code: number }).code;
+    }
+    if ('error' in error) {
+      const inner = (error as { error: unknown }).error;
+      if (typeof inner === 'object' && inner !== null && 'code' in inner && typeof (inner as { code: unknown }).code === 'number') {
+        return (inner as { code: number }).code;
+      }
+    }
+  }
+
+  const msg = error instanceof Error ? error.message : String(error);
+  const match = msg.match(/"code"\s*:\s*(\d{3})/i) || msg.match(/\b(4\d\d|5\d\d)\b/);
+  if (match) {
+    const parsed = parseInt(match[1], 10);
+    if (!isNaN(parsed)) return parsed;
+  }
+
+  return null;
+}
+
+/**
+ * 🚦 Phán đoán xem mã lỗi có thuộc diện có thể thử lại qua Model khác (Cascade Retryable) hay không
+ */
+export function isCascadeRetryable(status: number | null, attemptIndex: number): boolean {
+  // Lỗi vĩnh viễn: 401 Unauthorized, 403 Forbidden, 400 Bad Request -> DỪNG NGAY
+  if (status === 401 || status === 403 || status === 400) {
+    return false;
+  }
+
+  // Lỗi tạm thời của server: 503 (High demand), 502 (Bad gateway), 504 (Timeout), 500, 404 (Model deprecated) -> CHO PHÉP CASCADE
+  if (status === 503 || status === 502 || status === 504 || status === 500 || status === 404) {
+    return true;
+  }
+
+  // Lỗi giới hạn tần suất: 429 Too Many Requests -> Chỉ cho phép thử tối đa 1 model nhẹ hơn
+  if (status === 429) {
+    return attemptIndex === 0;
+  }
+
+  // Mặc định cho phép thử 1 lần cascade nếu là lỗi không xác định
+  return attemptIndex === 0;
+}
+
+/**
+ * 🎯 Phân tách Model Namespace theo từng Provider
+ */
+export function resolveCandidateModels(provider: string, configuredModel?: string): string[] {
+  if (provider === 'gemini') {
+    const list = [...GEMINI_DEFAULT_MODELS];
+    if (configuredModel && configuredModel.startsWith('gemini-') && !list.includes(configuredModel)) {
+      list.unshift(configuredModel);
+    }
+    return list;
+  }
+
+  if (provider === 'openai') {
+    const list = [...OPENAI_DEFAULT_MODELS];
+    if (configuredModel && !configuredModel.startsWith('gemini-') && !list.includes(configuredModel)) {
+      list.unshift(configuredModel);
+    }
+    return list;
+  }
+
+  return [configuredModel || 'default'];
+}
+
 async function callAI({
   systemPrompt,
   userMessage,
@@ -66,19 +154,12 @@ async function callAI({
         contents = userMessage;
       }
 
-      // 🛡️ MULTI-MODEL CASCADE: Tự động fallback qua các model dự phòng nếu model chính bị 503 (High Demand)
-      const candidateModels = Array.from(
-        new Set([
-          'gemini-3.6-flash',
-          env.aiModel,
-          'gemini-3.5-flash',
-          'gemini-3.5-flash-lite',
-          'gemini-flash-latest',
-        ].filter(Boolean) as string[])
-      );
+      // 🛡️ MULTI-MODEL SMART CASCADE: Tách biệt provider và phân loại mã lỗi HTTP
+      const candidateModels = resolveCandidateModels('gemini', env.aiModel);
 
       let lastGeminiError: unknown = null;
-      for (const candidateModel of candidateModels) {
+      for (let i = 0; i < candidateModels.length; i++) {
+        const candidateModel = candidateModels[i];
         try {
           const response = await geminiClient.models.generateContent({
             model: candidateModel,
@@ -93,11 +174,22 @@ async function callAI({
           lastGeminiError = null;
           break; // Thành công -> thoát vòng lặp
         } catch (err: unknown) {
-          logger.warn(`Gemini model ${candidateModel} failed, trying next candidate in cascade`, {
+          const httpStatus = extractHttpStatus(err);
+          const canRetry = isCascadeRetryable(httpStatus, i);
+
+          logger.warn(`Gemini model ${candidateModel} failed (Status: ${httpStatus})`, {
             candidateModel,
+            httpStatus,
+            canRetry,
             error: String(err),
           });
+
           lastGeminiError = err;
+
+          // Nếu gặp lỗi vĩnh viễn (401/403/400) hoặc hết lượt retry -> ngắt ngay lập tức!
+          if (!canRetry) {
+            break;
+          }
         }
       }
 

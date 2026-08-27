@@ -86,14 +86,12 @@ export async function addToConversation(
     const key = getRedisKey(discordUserId);
     const messageData = JSON.stringify({ role, content });
 
-    // Đẩy vào cuối mảng (Right Push)
-    await redisClient.rpush(key, messageData);
-
-    // Giữ tối đa N tin nhắn cuối cùng
-    await redisClient.ltrim(key, -MAX_MESSAGES_PER_USER, -1);
-
-    // Cập nhật TTL
-    await redisClient.expire(key, TTL_SECONDS);
+    // ⚡ REDIS PIPELINE: Gom 3 thao tác (RPUSH + LTRIM + EXPIRE) vào 1 atomic execution duy nhất (tiết kiệm 66% Quota)
+    const pipeline = redisClient.pipeline();
+    pipeline.rpush(key, messageData);
+    pipeline.ltrim(key, -MAX_MESSAGES_PER_USER, -1);
+    pipeline.expire(key, TTL_SECONDS);
+    await pipeline.exec();
   } catch (err) {
     logger.warn('Redis unavailable in addToConversation, saved to In-Memory store only', {
       discordUserId,
