@@ -7,14 +7,21 @@ import { registerHealthClient, startHealthServer, closeHealthServer } from './ut
 import { cleanupOldAiUsageLogs } from './services/cleanupService';
 import { sendWeeklyDigestToAllUsers } from './services/weeklyDigestService';
 import { sendDailyFlashcardReminder } from './services/dailyReminderService';
-import { getAllPomodoroStates, removePomodoroState, PomodoroStateMachine, PomodoroStatus, safeSetVoiceStatus, activeTimers } from './services/pomodoroService';
+import {
+  getAllPomodoroStates,
+  removePomodoroState,
+  PomodoroStateMachine,
+  PomodoroStatus,
+  safeSetVoiceStatus,
+  activeTimers,
+} from './services/pomodoroService';
+import { redisClient } from './config/redis';
 import * as interactionCreate from './events/interactionCreate';
 import * as voiceStateUpdate from './events/voiceStateUpdate';
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled Promise Rejection', {
     reason: String(reason),
-    promise: String(promise),
   });
 });
 
@@ -32,42 +39,59 @@ export const client = new Client({
 });
 
 client.once(Events.ClientReady, async (readyClient) => {
-  logger.info('Study Buddy Bot is ready', { tag: readyClient.user.tag, guilds: readyClient.guilds.cache.size });
-  
+  logger.info('Study Buddy Bot is ready', {
+    tag: readyClient.user.tag,
+    guilds: readyClient.guilds.cache.size,
+  });
+
   logger.info('✅ Async Worker Queues (AI Document & AI Image) đã sẵn sàng xử lý tác vụ.');
 
   // Tái thiết lập các phiên Pomodoro đang chạy dở dang từ Redis
   const activeSessions = await getAllPomodoroStates();
   let resumedCount = 0;
-  
+
   for (const session of activeSessions) {
     if (session.endsAt > Date.now()) {
       const remainingMs = session.endsAt - Date.now();
-      const stateMachine = new PomodoroStateMachine({ 
-        workMinutes: session.workMins, 
-        breakMinutes: session.breakMins 
+      const stateMachine = new PomodoroStateMachine({
+        workMinutes: session.workMins,
+        breakMinutes: session.breakMins,
       });
-      
+
       // Cần fast-forward state machine tới đúng trạng thái
       if (session.status === PomodoroStatus.BREAK) {
-         stateMachine.advancePhase(); // Lên BREAK
+        stateMachine.advancePhase(); // Lên BREAK
       }
 
-      const channel = await client.channels.fetch(session.channelId).catch(() => null) as VoiceChannel | null;
-      const textChannel = await client.channels.fetch(session.textChannelId).catch(() => null) as TextChannel | null;
+      const channel = (await client.channels
+        .fetch(session.channelId)
+        .catch(() => null)) as VoiceChannel | null;
+      const textChannel = (await client.channels
+        .fetch(session.textChannelId)
+        .catch(() => null)) as TextChannel | null;
 
       if (channel) {
         const timeout = setTimeout(async () => {
-           const nextStatus = stateMachine.advancePhase();
-           if (nextStatus === PomodoroStatus.BREAK) {
-             safeSetVoiceStatus(channel, `☕ Giờ nghỉ giải lao (${session.breakMins}m)`).catch(() => {});
-             if (textChannel) await textChannel.send(`☕ Hết giờ học! Hãy nghỉ ngơi **${session.breakMins} phút** nhé.`).catch(() => {});
-           } else {
-             safeSetVoiceStatus(channel, `🍅 Đang tập trung Pomodoro (${session.workMins}m)`).catch(() => {});
-             if (textChannel) await textChannel.send(`🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${session.workMins} phút**.`).catch(() => {});
-           }
+          const nextStatus = stateMachine.advancePhase();
+          if (nextStatus === PomodoroStatus.BREAK) {
+            safeSetVoiceStatus(channel, `☕ Giờ nghỉ giải lao (${session.breakMins}m)`).catch(
+              () => {}
+            );
+            if (textChannel)
+              await textChannel
+                .send(`☕ Hết giờ học! Hãy nghỉ ngơi **${session.breakMins} phút** nhé.`)
+                .catch(() => {});
+          } else {
+            safeSetVoiceStatus(channel, `🍅 Đang tập trung Pomodoro (${session.workMins}m)`).catch(
+              () => {}
+            );
+            if (textChannel)
+              await textChannel
+                .send(`🍅 Hết giờ nghỉ! Bắt đầu hiệp học tiếp theo **${session.workMins} phút**.`)
+                .catch(() => {});
+          }
         }, remainingMs);
-        
+
         activeTimers.set(session.channelId, timeout);
         resumedCount++;
       }
@@ -75,9 +99,9 @@ client.once(Events.ClientReady, async (readyClient) => {
       await removePomodoroState(session.channelId);
     }
   }
-  
+
   if (resumedCount > 0) {
-     logger.info(`Khôi phục thành công ${resumedCount} phiên Pomodoro từ Redis.`);
+    logger.info(`Khôi phục thành công ${resumedCount} phiên Pomodoro từ Redis.`);
   }
 
   registerHealthClient(client);
@@ -143,8 +167,9 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 async function handleShutdown(signal: string): Promise<void> {
   logger.info(`Received ${signal}, initiating graceful shutdown...`);
   await closeHealthServer();
-  client.destroy();
+  await client.destroy();
   await prisma.$disconnect();
+  await redisClient.quit().catch(() => {});
   logger.info('Cleanup complete. Bot exited cleanly.');
   process.exit(0);
 }
@@ -153,5 +178,8 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 if (process.env.NODE_ENV !== 'test') {
-  client.login(env.discordToken);
+  client.login(env.discordToken).catch((err) => {
+    logger.error('Discord login failed — shutting down', { error: String(err) });
+    process.exit(1);
+  });
 }

@@ -18,7 +18,6 @@ import { generateFlashcardsJson, parseFlashcardAIResponse } from '../services/ai
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
 import { resolveGuildId } from '../utils/guildResolver';
-import { sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
@@ -29,10 +28,18 @@ export const data = new SlashCommandBuilder()
       .setName('deck-create')
       .setDescription('Tạo một bộ thẻ ghi nhớ mới')
       .addStringOption((opt) =>
-        opt.setName('ten_bo_the').setDescription('Tên bộ thẻ (tối đa 100 ký tự)').setRequired(true).setMaxLength(100)
+        opt
+          .setName('ten_bo_the')
+          .setDescription('Tên bộ thẻ (tối đa 100 ký tự)')
+          .setRequired(true)
+          .setMaxLength(100)
       )
       .addStringOption((opt) =>
-        opt.setName('mo_ta').setDescription('Mô tả ngắn về bộ thẻ này').setRequired(false).setMaxLength(200)
+        opt
+          .setName('mo_ta')
+          .setDescription('Mô tả ngắn về bộ thẻ này')
+          .setRequired(false)
+          .setMaxLength(200)
       )
   )
   .addSubcommand((sub) =>
@@ -48,10 +55,18 @@ export const data = new SlashCommandBuilder()
           .setAutocomplete(true)
       )
       .addStringOption((opt) =>
-        opt.setName('mat_truoc').setDescription('Mặt trước (Khái niệm/Từ vựng/Câu hỏi)').setRequired(true).setMaxLength(1000)
+        opt
+          .setName('mat_truoc')
+          .setDescription('Mặt trước (Khái niệm/Từ vựng/Câu hỏi)')
+          .setRequired(true)
+          .setMaxLength(1000)
       )
       .addStringOption((opt) =>
-        opt.setName('mat_sau').setDescription('Mặt sau (Định nghĩa/Giải thích/Đáp án)').setRequired(true).setMaxLength(1000)
+        opt
+          .setName('mat_sau')
+          .setDescription('Mặt sau (Định nghĩa/Giải thích/Đáp án)')
+          .setRequired(true)
+          .setMaxLength(1000)
       )
   )
   .addSubcommand((sub) =>
@@ -67,10 +82,19 @@ export const data = new SlashCommandBuilder()
           .setAutocomplete(true)
       )
       .addStringOption((opt) =>
-        opt.setName('chu_de').setDescription('Chủ đề bạn muốn AI tạo thẻ').setRequired(true).setMaxLength(200)
+        opt
+          .setName('chu_de')
+          .setDescription('Chủ đề bạn muốn AI tạo thẻ')
+          .setRequired(true)
+          .setMaxLength(200)
       )
       .addIntegerOption((opt) =>
-        opt.setName('so_the').setDescription('Số lượng thẻ (1 - 5)').setMinValue(1).setMaxValue(5).setRequired(false)
+        opt
+          .setName('so_the')
+          .setDescription('Số lượng thẻ (1 - 5)')
+          .setMinValue(1)
+          .setMaxValue(5)
+          .setRequired(false)
       )
   )
   .addSubcommand((sub) =>
@@ -87,7 +111,9 @@ export const data = new SlashCommandBuilder()
       )
   )
   .addSubcommand((sub) =>
-    sub.setName('list').setDescription('Xem danh sách tất cả các bộ thẻ và số thẻ cần ôn tập hôm nay')
+    sub
+      .setName('list')
+      .setDescription('Xem danh sách tất cả các bộ thẻ và số thẻ cần ôn tập hôm nay')
   )
   .addSubcommand((sub) =>
     sub
@@ -102,7 +128,10 @@ export const data = new SlashCommandBuilder()
           .setAutocomplete(true)
       )
       .addUserOption((opt) =>
-        opt.setName('nguoi_nhan').setDescription('Người bạn muốn chia sẻ bộ thẻ này').setRequired(true)
+        opt
+          .setName('nguoi_nhan')
+          .setDescription('Người bạn muốn chia sẻ bộ thẻ này')
+          .setRequired(true)
       )
   );
 
@@ -222,7 +251,9 @@ async function startReviewSession(
       // BƯỚC A: Hiện mặt trước + Nút lật thẻ
       const frontEmbed = new EmbedBuilder()
         .setTitle(`🧠 Ôn Tập Thẻ: ${card.deck.name} (${idx + 1}/${dueCards.length})`)
-        .setDescription(`### ❓ Mặt trước:\n**${card.front}**\n\n*(Hãy suy nghĩ câu trả lời trong đầu rồi bấm nút bên dưới)*`)
+        .setDescription(
+          `### ❓ Mặt trước:\n**${card.front}**\n\n*(Hãy suy nghĩ câu trả lời trong đầu rồi bấm nút bên dưới)*`
+        )
         .setColor(0x5865f2)
         .setFooter({ text: `Lặp lại lần: ${card.repetition} • EF: ${card.easeFactor}` });
 
@@ -265,14 +296,33 @@ async function startReviewSession(
                 `*Hãy tự đánh giá mức độ nhớ của bạn:*`
             )
             .setColor(0xfee75c)
-            .setFooter({ text: 'Thuật toán SM-2 sẽ tính toán ngày ôn tiếp theo dựa trên đánh giá của bạn' });
+            .setFooter({
+              text: 'Thuật toán SM-2 sẽ tính toán ngày ôn tiếp theo dựa trên đánh giá của bạn',
+            });
 
-          const rBtn1 = new ButtonBuilder().setCustomId('sm2_rate_1').setLabel('🔴 Quên (1)').setStyle(ButtonStyle.Danger);
-          const rBtn3 = new ButtonBuilder().setCustomId('sm2_rate_3').setLabel('🟡 Khó (3)').setStyle(ButtonStyle.Secondary);
-          const rBtn4 = new ButtonBuilder().setCustomId('sm2_rate_4').setLabel('🟢 Nhớ Tốt (4)').setStyle(ButtonStyle.Success);
-          const rBtn5 = new ButtonBuilder().setCustomId('sm2_rate_5').setLabel('🌟 Rất Dễ (5)').setStyle(ButtonStyle.Primary);
+          const rBtn1 = new ButtonBuilder()
+            .setCustomId('sm2_rate_1')
+            .setLabel('🔴 Quên (1)')
+            .setStyle(ButtonStyle.Danger);
+          const rBtn3 = new ButtonBuilder()
+            .setCustomId('sm2_rate_3')
+            .setLabel('🟡 Khó (3)')
+            .setStyle(ButtonStyle.Secondary);
+          const rBtn4 = new ButtonBuilder()
+            .setCustomId('sm2_rate_4')
+            .setLabel('🟢 Nhớ Tốt (4)')
+            .setStyle(ButtonStyle.Success);
+          const rBtn5 = new ButtonBuilder()
+            .setCustomId('sm2_rate_5')
+            .setLabel('🌟 Rất Dễ (5)')
+            .setStyle(ButtonStyle.Primary);
 
-          const ratingRow = new ActionRowBuilder<ButtonBuilder>().addComponents(rBtn1, rBtn3, rBtn4, rBtn5);
+          const ratingRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+            rBtn1,
+            rBtn3,
+            rBtn4,
+            rBtn5
+          );
 
           const ratingMsg = await interaction.editReply({
             embeds: [backEmbed],
@@ -334,21 +384,28 @@ async function startReviewSession(
                 .setFooter({ text: 'Hẹn gặp lại bạn trong phiên ôn tiếp theo!' })
                 .setTimestamp();
 
-              await interaction.editReply({ embeds: [finishEmbed], components: [], allowedMentions: { parse: [] } });
+              await interaction.editReply({
+                embeds: [finishEmbed],
+                components: [],
+                allowedMentions: { parse: [] },
+              });
             }
           });
 
-          ratingCollector.on('end', async (_: Collection<Snowflake, ButtonInteraction>, reason: string) => {
-            if (reason === 'time') {
-              const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-                rBtn1.setDisabled(true),
-                rBtn3.setDisabled(true),
-                rBtn4.setDisabled(true),
-                rBtn5.setDisabled(true)
-              );
-              await interaction.editReply({ components: [disabledRow] }).catch(() => {});
+          ratingCollector.on(
+            'end',
+            async (_: Collection<Snowflake, ButtonInteraction>, reason: string) => {
+              if (reason === 'time') {
+                const disabledRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+                  rBtn1.setDisabled(true),
+                  rBtn3.setDisabled(true),
+                  rBtn4.setDisabled(true),
+                  rBtn5.setDisabled(true)
+                );
+                await interaction.editReply({ components: [disabledRow] }).catch(() => {});
+              }
             }
-          });
+          );
         }
       });
 
@@ -366,9 +423,13 @@ async function startReviewSession(
   } catch (error) {
     logger.error('Error in flashcard review', { userId: user.id, error: String(error) });
     if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ content: '❌ Có lỗi xảy ra trong phiên ôn tập.', components: [], embeds: [] }).catch(() => {});
+      await interaction
+        .editReply({ content: '❌ Có lỗi xảy ra trong phiên ôn tập.', components: [], embeds: [] })
+        .catch(() => {});
     } else {
-      await interaction.reply({ content: '❌ Có lỗi xảy ra trong phiên ôn tập.', ephemeral: true }).catch(() => {});
+      await interaction
+        .reply({ content: '❌ Có lỗi xảy ra trong phiên ôn tập.', ephemeral: true })
+        .catch(() => {});
     }
   }
 }
@@ -395,7 +456,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (existing) {
-        await interaction.reply({ content: `❌ Bạn đã có một bộ thẻ tên là **"${deckName}"** rồi.`, ephemeral: true });
+        await interaction.reply({
+          content: `❌ Bạn đã có một bộ thẻ tên là **"${deckName}"** rồi.`,
+          ephemeral: true,
+        });
         return;
       }
 
@@ -504,7 +568,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const flashcards = parseFlashcardAIResponse(rawAiJson);
 
       if (!flashcards || flashcards.length === 0) {
-        await interaction.editReply({ content: '⚠️ AI chưa tạo được flashcard phù hợp. Vui lòng thử lại với chủ đề rõ ràng hơn.' });
+        await interaction.editReply({
+          content:
+            '⚠️ AI chưa tạo được flashcard phù hợp. Vui lòng thử lại với chủ đề rõ ràng hơn.',
+        });
         return;
       }
 
@@ -524,7 +591,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       const embed = new EmbedBuilder()
         .setTitle(`✨ AI Đã Tạo Xong ${flashcards.length} Thẻ Cho Bộ "${deckName}"`)
-        .setDescription(`Chủ đề: **${topic}**\n\nCác thẻ đã được thêm vào bộ thẻ và sẵn sàng để ôn tập ngay!`)
+        .setDescription(
+          `Chủ đề: **${topic}**\n\nCác thẻ đã được thêm vào bộ thẻ và sẵn sàng để ôn tập ngay!`
+        )
         .setColor(0x5865f2)
         .addFields(
           flashcards.slice(0, 5).map((f, idx) => ({
@@ -560,7 +629,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       if (decks.length === 0) {
         await interaction.reply({
-          content: '📭 Bạn chưa có bộ thẻ nào! Hãy tạo bộ thẻ đầu tiên bằng lệnh `/flashcard deck-create` hoặc `/flashcard ai-generate`.',
+          content:
+            '📭 Bạn chưa có bộ thẻ nào! Hãy tạo bộ thẻ đầu tiên bằng lệnh `/flashcard deck-create` hoặc `/flashcard ai-generate`.',
           ephemeral: true,
         });
         return;
@@ -583,7 +653,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       const embed = new EmbedBuilder()
         .setTitle(`🗂️ Danh Sách Bộ Thẻ Của ${interaction.user.username}`)
-        .setDescription(`Tổng cộng: **${decks.length} bộ** | **${totalCards} thẻ** | Cần ôn hôm nay: 🔥 **${totalDue} thẻ**`)
+        .setDescription(
+          `Tổng cộng: **${decks.length} bộ** | **${totalCards} thẻ** | Cần ôn hôm nay: 🔥 **${totalDue} thẻ**`
+        )
         .setColor(0x5865f2)
         .addFields(deckFields)
         .setFooter({ text: 'Dùng /flashcard review để ôn bài theo thuật toán SM-2' })
@@ -623,14 +695,18 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       if (decks.length === 0) {
         await interaction.reply({
-          content: '⚠️ Bạn chưa có bộ thẻ nào. Hãy dùng `/flashcard deck-create` hoặc `/flashcard ai-generate` để tạo bộ thẻ đầu tiên nhé!',
+          content:
+            '⚠️ Bạn chưa có bộ thẻ nào. Hãy dùng `/flashcard deck-create` hoặc `/flashcard ai-generate` để tạo bộ thẻ đầu tiên nhé!',
           ephemeral: true,
         });
         return;
       }
 
       const totalCards = decks.reduce((acc, d) => acc + d.cards.length, 0);
-      const totalDue = decks.reduce((acc, d) => acc + d.cards.filter((c) => c.nextReviewAt <= now).length, 0);
+      const totalDue = decks.reduce(
+        (acc, d) => acc + d.cards.filter((c) => c.nextReviewAt <= now).length,
+        0
+      );
 
       if (totalDue === 0) {
         await interaction.reply({
@@ -645,7 +721,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         {
           label: '🔥 Ôn tập tất cả thẻ đến hạn',
           value: '__ALL__',
-          description: `Tổng cộng ${totalDue} thẻ đang chờ ôn trên ${decks.length} bộ thẻ`.slice(0, 100),
+          description: `Tổng cộng ${totalDue} thẻ đang chờ ôn trên ${decks.length} bộ thẻ`.slice(
+            0,
+            100
+          ),
           emoji: '📚',
         },
         ...decks
@@ -654,7 +733,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             return {
               label: d.name.slice(0, 100),
               value: d.name.slice(0, 100),
-              description: `${due > 0 ? `🔥 ${due} thẻ cần ôn` : '✅ Đã hoàn thành'} • Tổng: ${d.cards.length} thẻ`.slice(0, 100),
+              description:
+                `${due > 0 ? `🔥 ${due} thẻ cần ôn` : '✅ Đã hoàn thành'} • Tổng: ${d.cards.length} thẻ`.slice(
+                  0,
+                  100
+                ),
               emoji: due > 0 ? '⏰' : '📁',
             };
           })
@@ -711,7 +794,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     } catch (error) {
       logger.error('Error in flashcard review menu', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi tải danh sách bộ thẻ ôn tập.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Có lỗi khi tải danh sách bộ thẻ ôn tập.',
+        ephemeral: true,
+      });
       return;
     }
   }
@@ -722,12 +808,18 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const recipientUser = interaction.options.getUser('nguoi_nhan', true);
 
     if (recipientUser.bot) {
-      await interaction.reply({ content: '❌ Bạn không thể chia sẻ bộ thẻ cho Bot.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Bạn không thể chia sẻ bộ thẻ cho Bot.',
+        ephemeral: true,
+      });
       return;
     }
 
     if (recipientUser.id === interaction.user.id) {
-      await interaction.reply({ content: '❌ Bạn không thể tự chia sẻ bộ thẻ cho chính mình.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Bạn không thể tự chia sẻ bộ thẻ cho chính mình.',
+        ephemeral: true,
+      });
       return;
     }
 
@@ -738,7 +830,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!sourceDeck) {
-        await interaction.reply({ content: `❌ Bạn không có bộ thẻ nào tên là **"${deckName}"**.`, ephemeral: true });
+        await interaction.reply({
+          content: `❌ Bạn không có bộ thẻ nào tên là **"${deckName}"**.`,
+          ephemeral: true,
+        });
         return;
       }
 
@@ -765,8 +860,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .setColor(0xfee75c);
 
       const confirmRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId('confirm_share').setLabel('✅ Đồng Ý Gửi').setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId('cancel_share').setLabel('❌ Hủy').setStyle(ButtonStyle.Secondary)
+        new ButtonBuilder()
+          .setCustomId('confirm_share')
+          .setLabel('✅ Đồng Ý Gửi')
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId('cancel_share')
+          .setLabel('❌ Hủy')
+          .setStyle(ButtonStyle.Secondary)
       );
 
       const confirmMsg = await interaction.reply({

@@ -1,9 +1,9 @@
 /**
  * 🗄️ DATABASE EDGE-CASE SIMULATOR
- * 
+ *
  * Bộ kiểm thử mô phỏng các lỗi cơ sở dữ liệu trong production,
  * được xây dựng dựa trên lỗi FK Violation thực tế từ Sprint 2.
- * 
+ *
  * Kiểm thử 5 nhóm lỗi CSDL:
  *  1. FK Violation — Snowflake ID vs Internal UUID
  *  2. Unique Constraint Violations (P2002)
@@ -133,10 +133,13 @@ describe('🗄️ DATABASE EDGE-CASE SIMULATOR (Bộ Giả Lập Lỗi Cơ Sở 
   // =========================================================================
   describe('Scenario 2: Unique Constraint Violations — P2002 Handling', () => {
     it('Case 2.1: FlashcardDeck (userId, name) duplicate → phát hiện và xử lý P2002', async () => {
-      const p2002Error = Object.assign(new Error('Unique constraint failed on the fields: (`userId`,`name`)'), {
-        code: 'P2002',
-        meta: { target: ['userId', 'name'] },
-      });
+      const p2002Error = Object.assign(
+        new Error('Unique constraint failed on the fields: (`userId`,`name`)'),
+        {
+          code: 'P2002',
+          meta: { target: ['userId', 'name'] },
+        }
+      );
 
       (mockPrisma.flashcardDeck.create as jest.Mock).mockRejectedValue(p2002Error);
 
@@ -288,17 +291,45 @@ describe('🗄️ DATABASE EDGE-CASE SIMULATOR (Bộ Giả Lập Lỗi Cơ Sở 
 
       let result: any = null;
       await prisma.$transaction(async (tx: any) => {
-        const existingDeck = await tx.flashcardDeck.findUnique({ where: { userId_name: { userId: 'u1', name: 'D1' } } });
+        const existingDeck = await tx.flashcardDeck.findUnique({
+          where: { userId_name: { userId: 'u1', name: 'D1' } },
+        });
         expect(existingDeck).toBeNull();
 
         const deck = await tx.flashcardDeck.create({
           data: { userId: 'u1', guildId: null, name: 'D1', description: null },
         });
-        const inserted = await tx.flashcard.createMany({ data: [
-          { deckId: deck.id, front: 'F1', back: 'B1', repetition: 0, interval: 1, easeFactor: 2.5, nextReviewAt: new Date() },
-          { deckId: deck.id, front: 'F2', back: 'B2', repetition: 0, interval: 1, easeFactor: 2.5, nextReviewAt: new Date() },
-          { deckId: deck.id, front: 'F3', back: 'B3', repetition: 0, interval: 1, easeFactor: 2.5, nextReviewAt: new Date() },
-        ] });
+        const inserted = await tx.flashcard.createMany({
+          data: [
+            {
+              deckId: deck.id,
+              front: 'F1',
+              back: 'B1',
+              repetition: 0,
+              interval: 1,
+              easeFactor: 2.5,
+              nextReviewAt: new Date(),
+            },
+            {
+              deckId: deck.id,
+              front: 'F2',
+              back: 'B2',
+              repetition: 0,
+              interval: 1,
+              easeFactor: 2.5,
+              nextReviewAt: new Date(),
+            },
+            {
+              deckId: deck.id,
+              front: 'F3',
+              back: 'B3',
+              repetition: 0,
+              interval: 1,
+              easeFactor: 2.5,
+              nextReviewAt: new Date(),
+            },
+          ],
+        });
         result = { deckId: deck.id, count: inserted.count };
       });
 
@@ -310,7 +341,7 @@ describe('🗄️ DATABASE EDGE-CASE SIMULATOR (Bộ Giả Lập Lỗi Cơ Sở 
       (mockPrisma.$transaction as jest.Mock).mockRejectedValue(new Error('DB_CONSTRAINT_FAILED'));
 
       await expect(
-        prisma.$transaction(async (tx: any) => {
+        prisma.$transaction(async () => {
           // Nếu bước nào throw → toàn bộ transaction rollback
           throw new Error('DB_CONSTRAINT_FAILED');
         })
@@ -326,7 +357,7 @@ describe('🗄️ DATABASE EDGE-CASE SIMULATOR (Bộ Giả Lập Lỗi Cơ Sở 
 
       let caughtCode: string | undefined;
       try {
-        await prisma.$transaction(async (tx: any) => {});
+        await prisma.$transaction(async () => {});
       } catch (e: any) {
         caughtCode = e.code;
       }
@@ -356,7 +387,7 @@ describe('🗄️ DATABASE EDGE-CASE SIMULATOR (Bộ Giả Lập Lỗi Cơ Sở 
 
     it('Case 6.2: Discord Snowflake ID phải là chuỗi số 17-19 ký tự', () => {
       const discordGuildId = '1429513747193401511'; // 19 digits
-      const discordUserId = '987654321012345678';   // 18 digits
+      const discordUserId = '987654321012345678'; // 18 digits
 
       expect(DISCORD_SNOWFLAKE_REGEX.test(discordGuildId)).toBe(true);
       expect(DISCORD_SNOWFLAKE_REGEX.test(discordUserId)).toBe(true);

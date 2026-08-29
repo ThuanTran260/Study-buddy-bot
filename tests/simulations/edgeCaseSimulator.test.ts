@@ -1,4 +1,8 @@
-import { extractValidJson, parseAIJsonResponse, parseFlashcardAIResponse, parseStudyPackResponse } from '../../src/services/aiService';
+import {
+  parseAIJsonResponse,
+  parseFlashcardAIResponse,
+  parseStudyPackResponse,
+} from '../../src/services/aiService';
 import { calculateSM2 } from '../../src/services/sm2Service';
 import { getVNCalendarDate, calculateStreakUpdate } from '../../src/utils/dateUtils';
 import { sanitizeDiscordOutput } from '../../src/utils/sanitize';
@@ -79,10 +83,17 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
     it('Case 1.5: Handles wrapped objects { studyPack: { ... } } or arrays [ { ... } ]', () => {
       const wrappedJson = JSON.stringify({
         studyPack: {
-          summary: "• Luận điểm A",
-          flashcards: [{ front: "F", back: "B" }],
-          quiz: [{ question: "Q?", options: ["A. 1", "B. 2", "C. 3", "D. 4"], correctOption: "A", explanation: "E" }]
-        }
+          summary: '• Luận điểm A',
+          flashcards: [{ front: 'F', back: 'B' }],
+          quiz: [
+            {
+              question: 'Q?',
+              options: ['A. 1', 'B. 2', 'C. 3', 'D. 4'],
+              correctOption: 'A',
+              explanation: 'E',
+            },
+          ],
+        },
       });
       const parsed = parseStudyPackResponse(wrappedJson);
       expect(parsed).not.toBeNull();
@@ -92,9 +103,16 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
 
     it('Case 1.6: Auto-pads 2-option (True/False) questions to 4 options for Discord buttons', () => {
       const tfJson = JSON.stringify({
-        summary: "• Tóm tắt",
-        flashcards: [{ front: "F", back: "B" }],
-        quiz: [{ question: "Server Components chạy trên Server?", options: ["A. Đúng", "B. Sai"], correctOption: "A", explanation: "Đúng" }]
+        summary: '• Tóm tắt',
+        flashcards: [{ front: 'F', back: 'B' }],
+        quiz: [
+          {
+            question: 'Server Components chạy trên Server?',
+            options: ['A. Đúng', 'B. Sai'],
+            correctOption: 'A',
+            explanation: 'Đúng',
+          },
+        ],
       });
       const parsed = parseStudyPackResponse(tfJson);
       expect(parsed).not.toBeNull();
@@ -173,7 +191,7 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
 
     it('Case 3.2: Same calendar day within Vietnam timezone maintains streak', () => {
       const morning = new Date('2026-08-20T01:00:00Z'); // 08:00 AM VN
-      const night = new Date('2026-08-20T15:00:00Z');   // 22:00 PM VN
+      const night = new Date('2026-08-20T15:00:00Z'); // 22:00 PM VN
 
       expect(getVNCalendarDate(morning)).toBe(getVNCalendarDate(night));
 

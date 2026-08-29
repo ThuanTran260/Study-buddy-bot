@@ -13,11 +13,14 @@ export function sanitizeDiscordOutput(text: string): string {
  */
 export function sanitizeUnicodeInput(text: string): string {
   if (!text) return '';
-  return text
-    .normalize('NFC')
-    // Loại bỏ ký tự điều khiển ẩn và ký tự đảo ngược hướng văn bản RTL
-    .replace(/[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E]/g, '')
-    .trim();
+  return (
+    text
+      .normalize('NFC')
+      // Loại bỏ ký tự điều khiển ẩn và ký tự đảo ngược hướng văn bản RTL
+      // eslint-disable-next-line no-control-regex -- Control characters là mục tiêu chủ đích của sanitizer
+      .replace(/[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E]/g, '')
+      .trim()
+  );
 }
 
 /**
@@ -25,7 +28,7 @@ export function sanitizeUnicodeInput(text: string): string {
  */
 export function isPrintableText(content: string, minRatio = 0.85): boolean {
   if (!content || content.length === 0) return false;
-  
+
   // Nếu chứa ký tự null byte -> chắc chắn là file nhị phân
   if (content.includes('\0')) return false;
 
@@ -40,5 +43,5 @@ export function isPrintableText(content: string, minRatio = 0.85): boolean {
     }
   }
 
-  return (printableCount / sampleLength) >= minRatio;
+  return printableCount / sampleLength >= minRatio;
 }

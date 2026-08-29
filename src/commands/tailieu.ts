@@ -4,7 +4,7 @@ import {
   AutocompleteInteraction,
   EmbedBuilder,
 } from 'discord.js';
-import { extractDocumentContent, processStudyPackIngestion } from '../services/documentService';
+import { extractDocumentContent } from '../services/documentService';
 import { checkDbRateLimit } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
 import { resolveGuildId } from '../utils/guildResolver';
@@ -12,7 +12,9 @@ import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
   .setName('tailieu')
-  .setDescription('Chuyển đổi tài liệu bài giảng thành trọn bộ học tập (Tóm tắt + Flashcard + Quiz)')
+  .setDescription(
+    'Chuyển đổi tài liệu bài giảng thành trọn bộ học tập (Tóm tắt + Flashcard + Quiz)'
+  )
   .addStringOption((opt) =>
     opt
       .setName('ten_bo_the')
@@ -75,7 +77,7 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
       if (!interaction.responded) {
         await interaction.respond(choices.slice(0, 25));
       }
-    } catch (err) {
+    } catch {
       if (!interaction.responded) {
         await interaction.respond([]).catch(() => {});
       }
@@ -133,7 +135,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const pendingEmbed = new EmbedBuilder()
       .setTitle(`⏳ Đang xử lý tài liệu: "${deckName}"`)
-      .setDescription(`Bot đang cặm cụi đọc tài liệu của bạn (có thể mất 30-60 giây). Bạn có thể lướt Discord, kết quả sẽ tự động hiển thị ở tin nhắn này khi hoàn thành!`)
+      .setDescription(
+        `Bot đang cặm cụi đọc tài liệu của bạn (có thể mất 30-60 giây). Bạn có thể lướt Discord, kết quả sẽ tự động hiển thị ở tin nhắn này khi hoàn thành!`
+      )
       .setColor(0xfee75c)
       .setFooter({ text: `Hàng đợi: AI Background Job Worker` });
 
@@ -144,19 +148,24 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     let userFriendlyMsg = '❌ Có lỗi xảy ra khi trích xuất tài liệu.';
     if (errorMsg === 'EMPTY_INPUT') {
-      userFriendlyMsg = '⚠️ Bạn phải cung cấp đoạn văn bản (`noi_dung`) hoặc đính kèm một file tài liệu (`file`).';
+      userFriendlyMsg =
+        '⚠️ Bạn phải cung cấp đoạn văn bản (`noi_dung`) hoặc đính kèm một file tài liệu (`file`).';
     } else if (errorMsg === 'CONTENT_TOO_SHORT') {
-      userFriendlyMsg = '⚠️ Tài liệu của bạn quá ngắn (dưới 50 ký tự). Vui lòng cung cấp nội dung chi tiết hơn.';
+      userFriendlyMsg =
+        '⚠️ Tài liệu của bạn quá ngắn (dưới 50 ký tự). Vui lòng cung cấp nội dung chi tiết hơn.';
     } else if (errorMsg === 'INVALID_BINARY_CONTENT') {
-      userFriendlyMsg = '⚠️ File tài liệu chứa định dạng nhị phân không hợp lệ. Vui lòng gửi file văn bản thuần túy (.txt, .md).';
+      userFriendlyMsg =
+        '⚠️ File tài liệu chứa định dạng nhị phân không hợp lệ. Vui lòng gửi file văn bản thuần túy (.txt, .md).';
     } else if (errorMsg === 'INVALID_FILE_TYPE') {
-      userFriendlyMsg = '⚠️ Định dạng file không được hỗ trợ. Vui lòng chỉ gửi file `.txt` hoặc `.md`.';
+      userFriendlyMsg =
+        '⚠️ Định dạng file không được hỗ trợ. Vui lòng chỉ gửi file `.txt` hoặc `.md`.';
     } else if (errorMsg === 'FILE_TOO_LARGE') {
       userFriendlyMsg = '⚠️ Dung lượng file quá lớn. Vui lòng chọn file dưới 1MB.';
     } else if (errorMsg === 'FETCH_TIMEOUT') {
       userFriendlyMsg = '⏱️ Tải file từ Discord bị quá thời gian chờ. Vui lòng thử lại sau.';
     } else if (errorMsg === 'PROMPT_INJECTION_DETECTED') {
-      userFriendlyMsg = '🛡️ Tài liệu chứa nội dung cố gắng can thiệp vào AI (prompt injection). Vui lòng gửi nội dung học tập thuần túy.';
+      userFriendlyMsg =
+        '🛡️ Tài liệu chứa nội dung cố gắng can thiệp vào AI (prompt injection). Vui lòng gửi nội dung học tập thuần túy.';
     }
 
     await interaction.editReply({ content: userFriendlyMsg });

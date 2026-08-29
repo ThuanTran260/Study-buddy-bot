@@ -2,7 +2,6 @@ import { isPrintableText, sanitizeUnicodeInput } from '../../src/utils/sanitize'
 import { extractDocumentContent } from '../../src/services/documentService';
 import { sendDailyFlashcardReminder } from '../../src/services/dailyReminderService';
 import { calculateStreakUpdate } from '../../src/utils/dateUtils';
-import { calculateSM2 } from '../../src/services/sm2Service';
 import { prisma } from '../../src/config/prisma';
 
 jest.mock('../../src/config/prisma', () => ({
@@ -108,9 +107,9 @@ describe('🥊 CLIENT-SIDE EDGE CASE SIMULATOR & ADVERSARIAL DEFENSE (7 SCENARIO
     const maliciousBinaryContent = 'MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00';
     expect(isPrintableText(maliciousBinaryContent)).toBe(false);
 
-    await expect(
-      extractDocumentContent(maliciousBinaryContent, null, null, null)
-    ).rejects.toThrow('INVALID_BINARY_CONTENT');
+    await expect(extractDocumentContent(maliciousBinaryContent, null, null, null)).rejects.toThrow(
+      'INVALID_BINARY_CONTENT'
+    );
   });
 
   // =========================================================================

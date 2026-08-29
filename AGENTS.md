@@ -30,9 +30,10 @@ Dự án chuẩn hóa pnpm (`"packageManager": "pnpm@11.23.0"` trong package.jso
 ```bash
 pnpm add <pkg>        # không dùng: npm install <pkg>
 pnpm dev              # chạy bot
-pnpm test             # 29 test suites / 157 tests
+pnpm test             # 33 test suites / 190 tests
 pnpm exec tsc --noEmit
 pnpm run build
+pnpm lint             # ESLint 9 (type-checked) — bắt buộc pass
 ```
 
 ---
@@ -57,3 +58,4 @@ Không có bằng chứng chạy lệnh mới nhất = chưa hoàn thành.
 6. Lỗi trả về Discord che stack trace/table names; log chi tiết qua `logger.error()`.
 7. Check-then-act bọc trong `prisma.$transaction` chống race condition.
 8. Truyền Discord Snowflake ID thẳng vào FK là lỗi — dùng `resolveGuildId()`/resolver tương ứng.
+9. Phòng thủ tài nguyên: Tuân thủ 9 Bất biến tại `.agents/rules/resource_quota_defense.md` (Zero-Idle-Cost, Pipeline, Bounded Memory Fallback Map, Fail-Fast).

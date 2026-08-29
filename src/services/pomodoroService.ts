@@ -1,5 +1,6 @@
 import { VoiceChannel, Routes } from 'discord.js';
 import { logger } from '../utils/logger';
+import { BoundedMap } from '../utils/boundedMap';
 
 export enum PomodoroStatus {
   WORK = 'WORK',
@@ -13,13 +14,17 @@ export class PomodoroStateMachine {
   private readonly breakMinutes: number;
 
   constructor({ workMinutes, breakMinutes }: { workMinutes: number; breakMinutes: number }) {
-    if (workMinutes < 1 || workMinutes > 120) throw new Error('workMinutes must be between 1 and 120');
-    if (breakMinutes < 1 || breakMinutes > 60) throw new Error('breakMinutes must be between 1 and 60');
+    if (workMinutes < 1 || workMinutes > 120)
+      throw new Error('workMinutes must be between 1 and 120');
+    if (breakMinutes < 1 || breakMinutes > 60)
+      throw new Error('breakMinutes must be between 1 and 60');
     this.workMinutes = workMinutes;
     this.breakMinutes = breakMinutes;
   }
 
-  getStatus(): PomodoroStatus { return this.status; }
+  getStatus(): PomodoroStatus {
+    return this.status;
+  }
   getDurationMs(): number {
     return (this.status === PomodoroStatus.WORK ? this.workMinutes : this.breakMinutes) * 60_000;
   }
@@ -27,7 +32,9 @@ export class PomodoroStateMachine {
     this.status = this.status === PomodoroStatus.WORK ? PomodoroStatus.BREAK : PomodoroStatus.WORK;
     return this.status;
   }
-  stop(): void { this.status = PomodoroStatus.STOPPED; }
+  stop(): void {
+    this.status = PomodoroStatus.STOPPED;
+  }
 }
 
 import { redisClient } from '../config/redis';
@@ -44,7 +51,9 @@ export interface PomodoroState {
 }
 
 export const activeTimers = new Map<string, NodeJS.Timeout>();
-const localPomodoroFallback = new Map<string, PomodoroState>();
+// Trần 200 phòng Pomodoro trong RAM, eviction LRU tự động qua BoundedMap
+const MAX_FALLBACK_CHANNELS = 200;
+const localPomodoroFallback = new BoundedMap<string, PomodoroState>(MAX_FALLBACK_CHANNELS);
 
 export async function savePomodoroState(channelId: string, state: PomodoroState): Promise<void> {
   localPomodoroFallback.set(channelId, state);
@@ -61,7 +70,7 @@ export async function savePomodoroState(channelId: string, state: PomodoroState)
 export async function getPomodoroState(channelId: string): Promise<PomodoroState | null> {
   try {
     const data = await redisClient.hget(POMODORO_REDIS_KEY, channelId);
-    if (data) return JSON.parse(data);
+    if (data) return JSON.parse(data) as PomodoroState;
     return localPomodoroFallback.get(channelId) || null;
   } catch {
     return localPomodoroFallback.get(channelId) || null;
@@ -84,7 +93,7 @@ export async function getAllPomodoroStates(): Promise<PomodoroState[]> {
   try {
     const data = await redisClient.hgetall(POMODORO_REDIS_KEY);
     if (data && Object.keys(data).length > 0) {
-      return Object.values(data).map((v) => JSON.parse(v));
+      return Object.values(data).map((v) => JSON.parse(v) as PomodoroState);
     }
     return Array.from(localPomodoroFallback.values());
   } catch {
@@ -107,7 +116,10 @@ interface VoiceStatusCapableChannel {
  * @param channel Kênh voice của Discord
  * @param status Chuỗi trạng thái hiển thị (để null hoặc rỗng "" để xóa trạng thái)
  */
-export async function safeSetVoiceStatus(channel: VoiceChannel, status: string | null): Promise<boolean> {
+export async function safeSetVoiceStatus(
+  channel: VoiceChannel,
+  status: string | null
+): Promise<boolean> {
   const statusStr = status ?? '';
   try {
     const updatePromise = (async () => {
@@ -138,7 +150,11 @@ export async function safeSetVoiceStatus(channel: VoiceChannel, status: string |
     }
     return true;
   } catch (error) {
-    logger.warn('Failed to update voice channel status (non-critical)', { channelId: channel.id, status, error: String(error) });
+    logger.warn('Failed to update voice channel status (non-critical)', {
+      channelId: channel.id,
+      status,
+      error: String(error),
+    });
     return false;
   }
 }

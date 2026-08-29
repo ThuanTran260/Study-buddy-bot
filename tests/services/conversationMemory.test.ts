@@ -52,14 +52,18 @@ describe('conversationMemory', () => {
       const { redisClient } = await import('../../src/config/redis');
 
       // Giả lập Redis ném lỗi Quota Exceeded
-      const originalLrange = redisClient.lrange;
-      const originalRpush = redisClient.rpush;
-      jest.spyOn(redisClient, 'lrange').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
-      jest.spyOn(redisClient, 'rpush').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+      jest
+        .spyOn(redisClient, 'lrange')
+        .mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+      jest
+        .spyOn(redisClient, 'rpush')
+        .mockRejectedValue(new Error('ERR max daily request limit exceeded'));
 
       // Thao tác không ném lỗi và tự động lưu vào In-Memory store
-      await expect(addToConversation('user-fallback-1', 'user', 'Tin nhắn khi Redis hết quota')).resolves.not.toThrow();
-      
+      await expect(
+        addToConversation('user-fallback-1', 'user', 'Tin nhắn khi Redis hết quota')
+      ).resolves.not.toThrow();
+
       const history = await getConversationHistory('user-fallback-1');
       expect(history.length).toBe(1);
       expect(history[0].content).toBe('Tin nhắn khi Redis hết quota');

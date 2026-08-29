@@ -27,7 +27,7 @@ Quy tắc bắt buộc:
 2. Không trả lời các câu hỏi về nội dung bạo lực, kích động, vi phạm pháp luật.
 3. Tập trung vào mục tiêu học tập và giáo dục.`;
 
-const AI_TIMEOUT_MS = 120_000; // Tăng timeout lên 120s vì đã có BullMQ gánh
+const AI_TIMEOUT_MS = 120_000; // Tăng timeout lên 120s vì đã có AsyncWorkerQueue gánh
 
 // Khởi tạo clients
 const openaiClient = env.aiApiKey ? new OpenAI({ apiKey: env.aiApiKey }) : null;
@@ -40,26 +40,27 @@ export const GEMINI_DEFAULT_MODELS = [
   'gemini-flash-latest',
 ];
 
-export const OPENAI_DEFAULT_MODELS = [
-  'gpt-4o-mini',
-  'gpt-4o',
-  'gpt-3.5-turbo',
-];
+export const OPENAI_DEFAULT_MODELS = ['gpt-4o-mini', 'gpt-4o', 'gpt-3.5-turbo'];
 
 /**
  * 🏷️ Trích xuất mã trạng thái HTTP từ error object của Google SDK, OpenAI SDK hoặc raw response
  */
 export function extractHttpStatus(error: unknown): number | null {
   if (typeof error === 'object' && error !== null) {
-    if ('status' in error && typeof (error as { status: unknown }).status === 'number') {
+    if ('status' in error && typeof error.status === 'number') {
       return (error as { status: number }).status;
     }
-    if ('code' in error && typeof (error as { code: unknown }).code === 'number') {
+    if ('code' in error && typeof error.code === 'number') {
       return (error as { code: number }).code;
     }
     if ('error' in error) {
-      const inner = (error as { error: unknown }).error;
-      if (typeof inner === 'object' && inner !== null && 'code' in inner && typeof (inner as { code: unknown }).code === 'number') {
+      const inner = error.error;
+      if (
+        typeof inner === 'object' &&
+        inner !== null &&
+        'code' in inner &&
+        typeof inner.code === 'number'
+      ) {
         return (inner as { code: number }).code;
       }
     }
@@ -104,7 +105,11 @@ export function isCascadeRetryable(status: number | null, attemptIndex: number):
 export function resolveCandidateModels(provider: string, configuredModel?: string): string[] {
   if (provider === 'gemini') {
     const list = [...GEMINI_DEFAULT_MODELS];
-    if (configuredModel && configuredModel.startsWith('gemini-') && !list.includes(configuredModel)) {
+    if (
+      configuredModel &&
+      configuredModel.startsWith('gemini-') &&
+      !list.includes(configuredModel)
+    ) {
       list.unshift(configuredModel);
     }
     return list;
@@ -112,7 +117,11 @@ export function resolveCandidateModels(provider: string, configuredModel?: strin
 
   if (provider === 'openai') {
     const list = [...OPENAI_DEFAULT_MODELS];
-    if (configuredModel && !configuredModel.startsWith('gemini-') && !list.includes(configuredModel)) {
+    if (
+      configuredModel &&
+      !configuredModel.startsWith('gemini-') &&
+      !list.includes(configuredModel)
+    ) {
       list.unshift(configuredModel);
     }
     return list;
@@ -194,10 +203,18 @@ async function callAI({
       }
 
       if (lastGeminiError) {
-        throw lastGeminiError;
+        throw lastGeminiError instanceof Error
+          ? lastGeminiError
+          : new Error(
+              typeof lastGeminiError === 'string'
+                ? lastGeminiError
+                : JSON.stringify(lastGeminiError)
+            );
       }
     } else if (openaiClient) {
-      const messages: OpenAI.ChatCompletionMessageParam[] = [{ role: 'system', content: systemPrompt }];
+      const messages: OpenAI.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+      ];
       for (const h of history) {
         messages.push({
           role: h.role === 'model' ? 'assistant' : 'user',
@@ -225,7 +242,11 @@ async function callAI({
     if ((error as Error).name === 'AbortError') {
       throw new Error('AI_TIMEOUT');
     }
-    logger.error('AI API Error', { provider: env.aiProvider, model: env.aiModel, error: String(error) });
+    logger.error('AI API Error', {
+      provider: env.aiProvider,
+      model: env.aiModel,
+      error: String(error),
+    });
     throw error;
   } finally {
     clearTimeout(timeoutId);
@@ -270,7 +291,9 @@ export async function generateQuizJson(topic: string, questionCount: number): Pr
 }
 
 export function parseAIJsonResponse(raw: string): QuizQuestionData[] | null {
-  const result = safeParseAIJson(raw, QuizResponseSchema) as { questions: QuizQuestionData[] } | null;
+  const result = safeParseAIJson(raw, QuizResponseSchema) as {
+    questions: QuizQuestionData[];
+  } | null;
   return result ? result.questions : null;
 }
 
@@ -284,7 +307,9 @@ export async function generateFlashcardsJson(topic: string, count: number): Prom
 }
 
 export function parseFlashcardAIResponse(raw: string): FlashcardItemData[] | null {
-  const result = safeParseAIJson(raw, FlashcardResponseSchema) as { flashcards: FlashcardItemData[] } | null;
+  const result = safeParseAIJson(raw, FlashcardResponseSchema) as {
+    flashcards: FlashcardItemData[];
+  } | null;
   return result ? result.flashcards : null;
 }
 

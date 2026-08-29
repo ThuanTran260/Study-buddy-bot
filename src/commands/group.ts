@@ -1,10 +1,5 @@
-import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-  EmbedBuilder,
-} from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { prisma } from '../config/prisma';
-import { resolveGuildId } from '../utils/guildResolver';
 import { sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
 
@@ -16,7 +11,11 @@ export const data = new SlashCommandBuilder()
       .setName('create')
       .setDescription('Tạo một nhóm học tập mới trong Server')
       .addStringOption((opt) =>
-        opt.setName('ten_nhom').setDescription('Tên nhóm học tập (tối đa 50 ký tự)').setRequired(true).setMaxLength(50)
+        opt
+          .setName('ten_nhom')
+          .setDescription('Tên nhóm học tập (tối đa 50 ký tự)')
+          .setRequired(true)
+          .setMaxLength(50)
       )
   )
   .addSubcommand((sub) =>
@@ -24,7 +23,10 @@ export const data = new SlashCommandBuilder()
       .setName('invite')
       .setDescription('Mời một thành viên trong server tham gia nhóm (Chỉ dành cho Trưởng nhóm)')
       .addUserOption((opt) =>
-        opt.setName('nguoi_dung').setDescription('Thành viên bạn muốn mời vào nhóm').setRequired(true)
+        opt
+          .setName('nguoi_dung')
+          .setDescription('Thành viên bạn muốn mời vào nhóm')
+          .setRequired(true)
       )
   )
   .addSubcommand((sub) =>
@@ -35,11 +37,16 @@ export const data = new SlashCommandBuilder()
       .setName('kick')
       .setDescription('Mời một thành viên ra khỏi nhóm (Chỉ dành cho Trưởng nhóm)')
       .addUserOption((opt) =>
-        opt.setName('nguoi_dung').setDescription('Thành viên bạn muốn mời ra khỏi nhóm').setRequired(true)
+        opt
+          .setName('nguoi_dung')
+          .setDescription('Thành viên bạn muốn mời ra khỏi nhóm')
+          .setRequired(true)
       )
   )
   .addSubcommand((sub) =>
-    sub.setName('stats').setDescription('Xem thống kê học tập tổng hợp của cả nhóm & Vinh danh MVP tuần')
+    sub
+      .setName('stats')
+      .setDescription('Xem thống kê học tập tổng hợp của cả nhóm & Vinh danh MVP tuần')
   )
   .addSubcommand((sub) =>
     sub.setName('list').setDescription('Xem danh sách tất cả các nhóm học tập trong Server này')
@@ -167,7 +174,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const targetDiscordUser = interaction.options.getUser('nguoi_dung', true);
 
     if (targetDiscordUser.bot) {
-      await interaction.reply({ content: '❌ Bạn không thể mời Bot vào nhóm học tập.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Bạn không thể mời Bot vào nhóm học tập.',
+        ephemeral: true,
+      });
       return;
     }
 
@@ -371,7 +381,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     } catch (error) {
       logger.error('Error in /group kick', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi xảy ra khi kick thành viên.', ephemeral: true });
+      await interaction.reply({
+        content: '❌ Có lỗi xảy ra khi kick thành viên.',
+        ephemeral: true,
+      });
       return;
     }
   }
@@ -395,10 +408,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
                   user: {
                     include: {
                       quizSessions: {
-                        where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+                        where: {
+                          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                        },
                       },
                       pomodoroSessions: {
-                        where: { startedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+                        where: {
+                          startedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+                        },
                       },
                       flashcardDecks: {
                         include: { _count: { select: { cards: true } } },
@@ -414,7 +431,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       if (!membership) {
         await interaction.editReply({
-          content: '❌ Bạn chưa tham gia nhóm học tập nào. Hãy dùng `/group create` để tạo nhóm hoặc nhờ bạn bè mời vào nhóm nhé!',
+          content:
+            '❌ Bạn chưa tham gia nhóm học tập nào. Hãy dùng `/group create` để tạo nhóm hoặc nhờ bạn bè mời vào nhóm nhé!',
         });
         return;
       }
@@ -442,7 +460,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         totalCards += cardsCount;
 
         // Điểm hoạt động MVP = (Streak * 2) + (Quiz * 3) + (PomodoroHours * 2)
-        const activityScore = (u.streakCount * 2) + (quizCount * 3) + (Number(pomoHours) * 2);
+        const activityScore = u.streakCount * 2 + quizCount * 3 + Number(pomoHours) * 2;
         if (activityScore > mvpUser.score) {
           mvpUser = { username: u.username, score: activityScore };
         }
@@ -492,7 +510,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       if (groups.length === 0) {
         await interaction.reply({
-          content: '📭 Hiện chưa có nhóm học tập nào trong Server này. Hãy dùng `/group create` để tạo nhóm đầu tiên!',
+          content:
+            '📭 Hiện chưa có nhóm học tập nào trong Server này. Hãy dùng `/group create` để tạo nhóm đầu tiên!',
           ephemeral: true,
         });
         return;

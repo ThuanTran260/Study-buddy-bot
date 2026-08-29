@@ -1,6 +1,5 @@
 import Redis, { RedisOptions } from 'ioredis';
 import RedisMock from 'ioredis-mock';
-import { env } from './env';
 import { logger } from '../utils/logger';
 
 /**
@@ -8,18 +7,23 @@ import { logger } from '../utils/logger';
  */
 const redisOptions: RedisOptions = {
   retryStrategy(times) {
-    const delay = Math.min(times * 50, 2000);
+    // 🛑 Bounded Connection Retry: Nếu thử lại quá 20 lần (~1 phút), dừng reconnect để chống CPU/log spam
+    if (times > 20) {
+      logger.warn(
+        'Redis reconnection failed after 20 attempts. Operating in Memory-Fallback mode.'
+      );
+      return null;
+    }
+    const delay = Math.min(times * 100, 3000);
     return delay;
   },
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: 3, // Giới hạn tối đa 3 lần thử cho mỗi command
 };
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
 export const redisClient =
-  process.env.NODE_ENV === 'test'
-    ? (new RedisMock() as unknown as Redis)
-    : new Redis(redisUrl, redisOptions);
+  process.env.NODE_ENV === 'test' ? new RedisMock() : new Redis(redisUrl, redisOptions);
 
 redisClient.on('connect', () => {
   logger.info('🟢 Đã kết nối thành công tới Redis (Upstash/Local)');

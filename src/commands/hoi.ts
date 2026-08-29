@@ -8,7 +8,7 @@ import {
   AttachmentBuilder,
 } from 'discord.js';
 import { askAIWithVisualRouter } from '../services/aiService';
-import { renderMermaidToBuffer, extractMermaidCode } from '../services/visualService';
+import { renderMermaidToBuffer } from '../services/visualService';
 import { aiImageQueue } from '../workers/imageWorker';
 import {
   getConversationHistory,
@@ -26,7 +26,11 @@ export const data = new SlashCommandBuilder()
   .setName('hoi')
   .setDescription('Hỏi trợ lý AI học tập (tự động vẽ sơ đồ / ảnh minh họa & ghi nhớ ngữ cảnh)')
   .addStringOption((opt) =>
-    opt.setName('cau_hoi').setDescription('Nội dung câu hỏi của bạn').setRequired(true).setMaxLength(1000)
+    opt
+      .setName('cau_hoi')
+      .setDescription('Nội dung câu hỏi của bạn')
+      .setRequired(true)
+      .setMaxLength(1000)
   )
   .addBooleanOption((opt) =>
     opt
@@ -98,7 +102,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       if (mermaidBuffer) {
         logger.info('Đã render thành công sơ đồ Mermaid thành ảnh JPEG đính kèm');
         const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.jpg' });
-        
+
         // 🧹 Làm sạch khối code thô trong mô tả để chỉ hiển thị lời giải thích + Ảnh sơ đồ sắc nét
         let cleanedDescription = embedChunk
           .replace(/```mermaid[\s\S]*?```/gi, '')
@@ -132,7 +136,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       }
     }
     // 🎨 XỬ LÝ SINH ẢNH DƯỚI NỀN QUA BULLMQ (chỉ khi IMAGE_GEN_ENABLED=true)
-    else if (env.imageGenEnabled && aiResult.hasVisual && aiResult.visualType === 'image' && aiResult.visualPromptOrCode) {
+    else if (
+      env.imageGenEnabled &&
+      aiResult.hasVisual &&
+      aiResult.visualType === 'image' &&
+      aiResult.visualPromptOrCode
+    ) {
       const imageLimit = await checkDbRateLimit(user.id, 'AI_IMAGE_GEN');
       if (imageLimit.allowed) {
         embed.setFooter({
@@ -141,7 +150,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
         await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
 
-        // Đẩy vào BullMQ Background Queue (Bọc an toàn nếu Redis mất kết nối)
+        // Đẩy vào AsyncWorkerQueue Background Queue (In-Process, không phụ thuộc Redis)
         try {
           await aiImageQueue.add('generate-image', {
             userId: user.id,

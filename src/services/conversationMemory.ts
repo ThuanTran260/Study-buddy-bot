@@ -1,5 +1,6 @@
 import { redisClient } from '../config/redis';
 import { logger } from '../utils/logger';
+import { BoundedMap } from '../utils/boundedMap';
 
 export interface ConversationMessage {
   role: 'user' | 'model';
@@ -15,7 +16,12 @@ function getRedisKey(discordUserId: string): string {
 }
 
 // 🛡️ DỰ PHÒNG IN-MEMORY (Kích hoạt khi Redis hết Quota hoặc mất kết nối)
-const localMemoryFallback = new Map<string, { messages: ConversationMessage[]; lastUpdated: number }>();
+// Trần 500 người dùng trong RAM (chống OOM 512MB), eviction LRU tự động qua BoundedMap
+const MAX_FALLBACK_USERS = 500;
+const localMemoryFallback = new BoundedMap<
+  string,
+  { messages: ConversationMessage[]; lastUpdated: number }
+>(MAX_FALLBACK_USERS);
 
 function getLocalHistory(discordUserId: string): ConversationMessage[] {
   const entry = localMemoryFallback.get(discordUserId);
@@ -35,6 +41,7 @@ function addToLocalHistory(discordUserId: string, role: 'user' | 'model', conten
   current.push({ role, content });
 
   const trimmed = current.slice(-MAX_MESSAGES_PER_USER);
+
   localMemoryFallback.set(discordUserId, {
     messages: trimmed,
     lastUpdated: Date.now(),
@@ -48,18 +55,24 @@ function clearLocalHistory(discordUserId: string): void {
 /**
  * Lấy lịch sử hội thoại của người dùng (Có cơ chế Fallback In-Memory an toàn 100%)
  */
-export async function getConversationHistory(discordUserId: string): Promise<ConversationMessage[]> {
+export async function getConversationHistory(
+  discordUserId: string
+): Promise<ConversationMessage[]> {
   try {
     const key = getRedisKey(discordUserId);
-    const rawData = await redisClient.lrange(key, 0, -1);
+
+    // ⚡ REDIS PIPELINE: Gom LRANGE + EXPIRE vào 1 round-trip duy nhất (nhất quán với write path)
+    const pipeline = redisClient.pipeline();
+    pipeline.lrange(key, 0, -1);
+    pipeline.expire(key, TTL_SECONDS);
+    const execResult = await pipeline.exec();
+
+    const rawData = (execResult?.[0]?.[1] as string[] | undefined) ?? [];
 
     if (!rawData || rawData.length === 0) {
       // Nếu Redis rỗng, kiểm tra xem có dữ liệu trong fallback không
       return getLocalHistory(discordUserId);
     }
-
-    // Refresh TTL
-    await redisClient.expire(key, TTL_SECONDS).catch(() => {});
 
     return rawData.map((item) => JSON.parse(item) as ConversationMessage);
   } catch (err) {

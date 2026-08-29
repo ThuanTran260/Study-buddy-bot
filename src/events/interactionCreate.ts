@@ -1,7 +1,18 @@
-import { Events, Interaction, ChatInputCommandInteraction, AutocompleteInteraction } from 'discord.js';
+import {
+  Events,
+  Interaction,
+  ChatInputCommandInteraction,
+  AutocompleteInteraction,
+  AttachmentBuilder,
+  EmbedBuilder,
+} from 'discord.js';
 import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { redisClient } from '../config/redis';
+import { checkDbRateLimit } from '../services/dbRateLimiter';
+import { extractMermaidCode, renderMermaidToBuffer } from '../services/visualService';
+import { aiImageQueue } from '../workers/imageWorker';
 import * as hoiCommand from '../commands/hoi';
 import * as tomtatCommand from '../commands/tomtat';
 import * as pomodoroCommand from '../commands/pomodoro';
@@ -55,15 +66,18 @@ export async function execute(interaction: Interaction): Promise<void> {
         });
 
         await interaction.reply({
-          content: '🔕 Đã tắt tính năng nhắc nhở ôn tập hàng ngày. Bạn có thể bật lại bất cứ lúc nào bằng lệnh `/profile reminder:on`.',
+          content:
+            '🔕 Đã tắt tính năng nhắc nhở ôn tập hàng ngày. Bạn có thể bật lại bất cứ lúc nào bằng lệnh `/profile reminder:on`.',
           ephemeral: true,
         });
       } catch (err) {
         logger.error('Error disabling daily reminder via button', { error: String(err) });
-        await interaction.reply({
-          content: '❌ Có lỗi khi cập nhật cài đặt nhắc nhở.',
-          ephemeral: true,
-        }).catch(() => {});
+        await interaction
+          .reply({
+            content: '❌ Có lỗi khi cập nhật cài đặt nhắc nhở.',
+            ephemeral: true,
+          })
+          .catch(() => {});
       }
       return;
     }
@@ -72,7 +86,8 @@ export async function execute(interaction: Interaction): Promise<void> {
     if (interaction.customId.startsWith('btn_visual_')) {
       if (!env.imageGenEnabled) {
         await interaction.reply({
-          content: '⚠️ Tính năng tạo ảnh minh họa hiện đang tắt. Câu trả lời của bot là dạng văn bản thuần.',
+          content:
+            '⚠️ Tính năng tạo ảnh minh họa hiện đang tắt. Câu trả lời của bot là dạng văn bản thuần.',
           ephemeral: true,
         });
         return;
@@ -83,20 +98,21 @@ export async function execute(interaction: Interaction): Promise<void> {
       // 1. Author Guard: Chỉ người hỏi mới có quyền bấm
       if (interaction.user.id !== originalUserId) {
         await interaction.reply({
-          content: '⚠️ Chỉ người đặt câu hỏi ban đầu mới có quyền yêu cầu tạo ảnh cho tin nhắn này.',
+          content:
+            '⚠️ Chỉ người đặt câu hỏi ban đầu mới có quyền yêu cầu tạo ảnh cho tin nhắn này.',
           ephemeral: true,
         });
         return;
       }
 
-      const { redisClient } = await import('../config/redis');
       const lockKey = `visual_lock:${interaction.message.id}`;
 
       // 2. Atomic Redis Lock: Chống click đúp và spam nhiều request (Bắt lỗi an toàn nếu Redis mất kết nối)
       const acquired = await redisClient.set(lockKey, '1', 'EX', 60, 'NX').catch(() => 'OK');
       if (!acquired) {
         await interaction.reply({
-          content: '⏳ Đang có một tiến trình tạo ảnh cho câu trả lời này rồi. Vui lòng chờ vài giây nhé!',
+          content:
+            '⏳ Đang có một tiến trình tạo ảnh cho câu trả lời này rồi. Vui lòng chờ vài giây nhé!',
           ephemeral: true,
         });
         return;
@@ -110,7 +126,6 @@ export async function execute(interaction: Interaction): Promise<void> {
         });
 
         // 3. Kiểm tra hạn mức sinh ảnh
-        const { checkDbRateLimit } = await import('../services/dbRateLimiter');
         const limitCheck = await checkDbRateLimit(userRecord.id, 'AI_IMAGE_GEN');
         if (!limitCheck.allowed) {
           await redisClient.del(lockKey);
@@ -119,19 +134,17 @@ export async function execute(interaction: Interaction): Promise<void> {
         }
 
         // 4. Kiểm tra xem tin nhắn có chứa mã Mermaid không
-        const { extractMermaidCode, renderMermaidToBuffer } = await import('../services/visualService');
         const originalEmbed = interaction.message.embeds[0];
         const originalText = originalEmbed?.description || '';
         const mermaidCode = extractMermaidCode(originalText);
 
         if (mermaidCode) {
           // 4.1. Render trực tiếp Sơ đồ Mermaid trong 1 giây
-          const { AttachmentBuilder, EmbedBuilder } = await import('discord.js');
           const mermaidBuffer = await renderMermaidToBuffer(mermaidCode);
 
           if (mermaidBuffer) {
             const attachment = new AttachmentBuilder(mermaidBuffer, { name: 'diagram.jpg' });
-            
+
             let cleanedDescription = originalText
               .replace(/```mermaid[\s\S]*?```/gi, '')
               .replace(/sequenceDiagram[\s\S]+/i, '')
@@ -140,7 +153,8 @@ export async function execute(interaction: Interaction): Promise<void> {
               .trim();
 
             if (!cleanedDescription) {
-              cleanedDescription = 'Dưới đây là sơ đồ trực quan được tự động vẽ cho câu hỏi của bạn:';
+              cleanedDescription =
+                'Dưới đây là sơ đồ trực quan được tự động vẽ cho câu hỏi của bạn:';
             }
 
             const updatedEmbed = EmbedBuilder.from(originalEmbed)
@@ -161,8 +175,7 @@ export async function execute(interaction: Interaction): Promise<void> {
           components: [],
         });
 
-        // 5. Nếu không phải Mermaid -> Đẩy vào BullMQ Background Queue cho Imagen 3 / DALL-E
-        const { aiImageQueue } = await import('../workers/imageWorker');
+        // 5. Nếu không phải Mermaid -> Đẩy vào AsyncWorkerQueue Background Queue cho Imagen 3 / DALL-E
         await aiImageQueue.add('generate-image', {
           userId: userRecord.id,
           prompt: `Illustrate this study concept: ${originalText.slice(0, 300)}`,
@@ -173,7 +186,8 @@ export async function execute(interaction: Interaction): Promise<void> {
         });
 
         await interaction.followUp({
-          content: '🎨 Đã nhận lệnh! Bot đang cặm cụi vẽ ảnh minh họa dưới nền và sẽ cập nhật vào tin nhắn trong giây lát.',
+          content:
+            '🎨 Đã nhận lệnh! Bot đang cặm cụi vẽ ảnh minh họa dưới nền và sẽ cập nhật vào tin nhắn trong giây lát.',
           ephemeral: true,
         });
       } catch (err) {
@@ -187,10 +201,13 @@ export async function execute(interaction: Interaction): Promise<void> {
     // tự động phản hồi để Discord KHÔNG BỊ LỖI "bot didn't respond in time"
     setTimeout(async () => {
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: '⏱️ Phiên tương tác này đã hết hạn (hoặc Bot vừa cập nhật). Bạn vui lòng gõ lại lệnh để tiếp tục nhé!',
-          ephemeral: true,
-        }).catch(() => {});
+        await interaction
+          .reply({
+            content:
+              '⏱️ Phiên tương tác này đã hết hạn (hoặc Bot vừa cập nhật). Bạn vui lòng gõ lại lệnh để tiếp tục nhé!',
+            ephemeral: true,
+          })
+          .catch(() => {});
       }
     }, 1500);
 

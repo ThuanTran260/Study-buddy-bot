@@ -1,4 +1,4 @@
-import { Events, VoiceState, ChannelType, PermissionFlagsBits, Collection, GuildMember } from 'discord.js';
+import { Events, VoiceState, ChannelType, PermissionFlagsBits } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
 
@@ -17,7 +17,10 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
       where: { discordGuildId: guild.id },
     });
 
-    if (guildDb?.studyRoomTriggerChannelId && newState.channelId === guildDb.studyRoomTriggerChannelId) {
+    if (
+      guildDb?.studyRoomTriggerChannelId &&
+      newState.channelId === guildDb.studyRoomTriggerChannelId
+    ) {
       const userId = newState.member.id;
 
       // 1. Kiểm tra trần số lượng phòng voice đang mở của server
@@ -29,9 +32,11 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
       if (activeRoomsCount >= maxCap) {
         logger.warn('Study room cap reached for guild', { guildId: guild.id, cap: maxCap });
         // Gửi tin nhắn DM thông báo lý do rõ ràng trước khi ngắt kết nối
-        await newState.member.send(
-          `⚠️ Server **${guild.name}** hiện đã đạt giới hạn tối đa **${maxCap} phòng học tự động** cùng lúc. Vui lòng quay lại sau khi có phòng trống!`
-        ).catch(() => {}); // Nuốt lỗi an toàn nếu user tắt DM
+        await newState.member
+          .send(
+            `⚠️ Server **${guild.name}** hiện đã đạt giới hạn tối đa **${maxCap} phòng học tự động** cùng lúc. Vui lòng quay lại sau khi có phòng trống!`
+          )
+          .catch(() => {}); // Nuốt lỗi an toàn nếu user tắt DM
 
         await newState.member.voice.setChannel(null).catch(() => {});
         return;
@@ -50,7 +55,10 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
 
       try {
         const botMember = guild.members.me;
-        if (!botMember?.permissions.has(PermissionFlagsBits.ManageChannels) || !botMember?.permissions.has(PermissionFlagsBits.MoveMembers)) {
+        if (
+          !botMember?.permissions.has(PermissionFlagsBits.ManageChannels) ||
+          !botMember?.permissions.has(PermissionFlagsBits.MoveMembers)
+        ) {
           logger.warn('Bot lacks ManageChannels or MoveMembers permission', { guildId: guild.id });
           return;
         }
@@ -60,7 +68,10 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
           type: ChannelType.GuildVoice,
           parent: guildDb.studyRoomCategoryId ?? newState.channel?.parent ?? undefined,
           permissionOverwrites: [
-            { id: newState.member.id, allow: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MoveMembers] },
+            {
+              id: newState.member.id,
+              allow: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MoveMembers],
+            },
           ],
         });
 
@@ -84,7 +95,10 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
           roomCreationCooldown.set(userId, Date.now());
         } else {
           await newChannel.delete('User left before room setup');
-          await prisma.studyRoom.updateMany({ where: { channelId: newChannel.id }, data: { isActive: false } });
+          await prisma.studyRoom.updateMany({
+            where: { channelId: newChannel.id },
+            data: { isActive: false },
+          });
         }
       } catch (err) {
         logger.error('Auto study room error', { error: String(err) });
@@ -102,15 +116,17 @@ export async function execute(oldState: VoiceState, newState: VoiceState): Promi
     });
 
     const isVoice = channel.isVoiceBased();
-    if (roomRecord && roomRecord.isActive && isVoice && (channel.members as Collection<string, GuildMember>).size === 0) {
+    if (roomRecord && roomRecord.isActive && isVoice && channel.members.size === 0) {
       setTimeout(async () => {
         const refreshed = guild.channels.cache.get(channel.id);
-        if (refreshed && refreshed.isVoiceBased() && (refreshed.members as Collection<string, GuildMember>).size === 0) {
+        if (refreshed && refreshed.isVoiceBased() && refreshed.members.size === 0) {
           await refreshed.delete('Study room empty cleanup').catch(() => {});
-          await prisma.studyRoom.update({
-            where: { channelId: channel.id },
-            data: { isActive: false },
-          }).catch(() => {});
+          await prisma.studyRoom
+            .update({
+              where: { channelId: channel.id },
+              data: { isActive: false },
+            })
+            .catch(() => {});
         }
       }, 8_000);
     }

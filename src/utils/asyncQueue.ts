@@ -31,7 +31,7 @@ export class AsyncWorkerQueue<T> {
   /**
    * Đẩy một job mới vào hàng đợi
    */
-  async add(name: string, data: T): Promise<QueueJob<T>> {
+  add(name: string, data: T): Promise<QueueJob<T>> {
     this.jobCounter++;
     const job: QueueJob<T> = {
       id: `${this.queueName}-${Date.now()}-${this.jobCounter}`,
@@ -45,7 +45,7 @@ export class AsyncWorkerQueue<T> {
     // Kích hoạt xử lý bất đồng bộ
     this.processNext();
 
-    return job;
+    return Promise.resolve(job);
   }
 
   /**
@@ -73,7 +73,7 @@ export class AsyncWorkerQueue<T> {
     this.activeCount++;
 
     // Thực thi processor trong Promise độc lập để không block Event Loop
-    (async () => {
+    void (async () => {
       try {
         await this.processor(job);
       } catch (err: unknown) {

@@ -70,8 +70,10 @@ export function sanitizeMermaidCode(rawCode: string): string {
 
   // 1. Tự động vá Sequence Diagram syntax
   if (code.includes('sequenceDiagram')) {
-    code = code
-      .replace(/^\s*(database|queue|control|boundary|entity|collections)\s+/gmi, '    participant ');
+    code = code.replace(
+      /^\s*(database|queue|control|boundary|entity|collections)\s+/gim,
+      '    participant '
+    );
   }
 
   return code;
@@ -133,7 +135,8 @@ export type IllustrationResult =
   | { ok: true; buffer: Buffer }
   | {
       ok: false;
-      reason: 'EMPTY_PROMPT' | 'SAFETY_BLOCKED' | 'QUOTA_EXCEEDED' | 'CONFIG_ERROR' | 'GENERATION_FAILED';
+      reason:
+        'EMPTY_PROMPT' | 'SAFETY_BLOCKED' | 'QUOTA_EXCEEDED' | 'CONFIG_ERROR' | 'GENERATION_FAILED';
     };
 
 const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image'];
@@ -141,7 +144,8 @@ const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image']
 type IllustrationFailure = Extract<IllustrationResult, { ok: false }>;
 
 function classifyGenAiError(error: unknown): IllustrationFailure {
-  const status = (error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code;
+  const status =
+    (error as { status?: number; code?: number })?.status ?? (error as { code?: number })?.code;
   if (status === 429) return { ok: false, reason: 'QUOTA_EXCEEDED' };
   if (status === 403 || status === 404) return { ok: false, reason: 'CONFIG_ERROR' };
   return { ok: false, reason: 'GENERATION_FAILED' };
@@ -163,9 +167,13 @@ export async function generateAiIllustration(prompt: string): Promise<Illustrati
           });
 
           const blockReason = response?.promptFeedback?.blockReason;
-          const finishReason = response?.candidates?.[0]?.finishReason;
+          const finishReason = response?.candidates?.[0]?.finishReason as string | undefined;
           if (blockReason || finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
-            logger.warn('Illustration blocked by safety filter', { model, blockReason, finishReason });
+            logger.warn('Illustration blocked by safety filter', {
+              model,
+              blockReason,
+              finishReason,
+            });
             return { ok: false, reason: 'SAFETY_BLOCKED' };
           }
 
