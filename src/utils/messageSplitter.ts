@@ -29,7 +29,7 @@ export function splitForEmbedAndFollowUp(text: string): {
   }
 
   const allChunks = splitMessage(text, 4000);
-  const embedChunk = allChunks[0];
+  const embedChunk = allChunks[0] ?? text;
   const remainingText = allChunks.slice(1).join('\n\n');
   const followUpChunks = remainingText ? splitMessage(remainingText, 2000) : [];
 

@@ -247,6 +247,12 @@ async function startReviewSession(
 
     const sendCard = async (idx: number) => {
       const card = dueCards[idx];
+      if (!card) {
+        await interaction.editReply({
+          content: '❌ Không tìm thấy thẻ ôn tập. Vui lòng thử lệnh lại.',
+        });
+        return;
+      }
 
       // BƯỚC A: Hiện mặt trước + Nút lật thẻ
       const frontEmbed = new EmbedBuilder()
@@ -775,10 +781,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       menuCollector.on('collect', async (selectInt) => {
+        await selectInt.deferUpdate();
         const chosenValue = selectInt.values[0];
+        if (!chosenValue) return;
         const targetDeckName = chosenValue === '__ALL__' ? null : chosenValue;
 
-        await selectInt.deferUpdate();
         await startReviewSession(interaction, user, targetDeckName);
       });
 

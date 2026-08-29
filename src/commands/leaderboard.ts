@@ -177,12 +177,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const leaderboard = await getLeaderboardData(memberIds, type);
 
-    const typeTitles: Record<string, { title: string; emoji: string; color: number }> = {
+    const typeTitles = {
       streak: { title: 'Bảng Xếp Hạng Chuỗi Ngày Học (Streak)', emoji: '🔥', color: 0xed4245 },
       quiz: { title: 'Bảng Xếp Hạng Trắc Nghiệm AI (Quiz)', emoji: '📝', color: 0x5865f2 },
       pomodoro: { title: 'Bảng Xếp Hạng Thời Gian Pomodoro', emoji: '🍅', color: 0xfee75c },
       flashcard: { title: 'Bảng Xếp Hạng Thẻ Nhớ Thuộc Lòng (SM-2)', emoji: '🧠', color: 0x57f287 },
-    };
+    } satisfies Record<string, { title: string; emoji: string; color: number }>;
 
     const info = typeTitles[type];
     const embed = new EmbedBuilder()

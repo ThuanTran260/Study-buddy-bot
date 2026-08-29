@@ -40,8 +40,8 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       const parsed = parseStudyPackResponse(dirtyMarkdown);
       expect(parsed).not.toBeNull();
       expect(parsed?.summary).toContain('Luận điểm 1');
-      expect(parsed?.quiz[0].options[0].text).toBe('Lựa chọn 1');
-      expect(parsed?.quiz[0].correctOption).toBe('A');
+      expect(parsed?.quiz[0]?.options[0]?.text).toBe('Lựa chọn 1');
+      expect(parsed?.quiz[0]?.correctOption).toBe('A');
     });
 
     it('Case 1.3: Handles options formatted as key-value objects { "A": "text" }', () => {
@@ -57,8 +57,8 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       }`;
       const parsed = parseStudyPackResponse(kvJson);
       expect(parsed).not.toBeNull();
-      expect(parsed?.quiz[0].options.length).toBe(4);
-      expect(parsed?.quiz[0].correctOption).toBe('B');
+      expect(parsed?.quiz[0]?.options.length).toBe(4);
+      expect(parsed?.quiz[0]?.correctOption).toBe('B');
     });
 
     it('Case 1.4: Handles alternative field names (term/definition, answer/reason, overview/cards/questions)', () => {
@@ -75,9 +75,9 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       const parsed = parseStudyPackResponse(aliasJson);
       expect(parsed).not.toBeNull();
       expect(parsed?.summary).toBe('Tóm tắt bài giảng bảo mật');
-      expect(parsed?.flashcards[0].front).toBe('Thuật ngữ X');
-      expect(parsed?.quiz[0].correctOption).toBe('C');
-      expect(parsed?.quiz[0].explanation).toBe('Giải thích');
+      expect(parsed?.flashcards[0]?.front).toBe('Thuật ngữ X');
+      expect(parsed?.quiz[0]?.correctOption).toBe('C');
+      expect(parsed?.quiz[0]?.explanation).toBe('Giải thích');
     });
 
     it('Case 1.5: Handles wrapped objects { studyPack: { ... } } or arrays [ { ... } ]', () => {
@@ -116,8 +116,8 @@ describe('🛡️ ADVANCED CHAOS & EDGE-CASE SIMULATOR (Bộ Giả Lập Kiểm 
       });
       const parsed = parseStudyPackResponse(tfJson);
       expect(parsed).not.toBeNull();
-      expect(parsed?.quiz[0].options.length).toBe(4);
-      expect(parsed?.quiz[0].correctOption).toBe('A');
+      expect(parsed?.quiz[0]?.options.length).toBe(4);
+      expect(parsed?.quiz[0]?.correctOption).toBe('A');
     });
 
     it('Case 1.7: Safely rejects completely unrecoverable corrupt JSON without throwing', () => {

@@ -87,6 +87,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const sendQuestion = async (qIndex: number) => {
       const q = questions[qIndex];
+      if (!q) {
+        await interaction.editReply({
+          content: '❌ Không tìm thấy câu hỏi. Vui lòng thử lệnh lại.',
+        });
+        return;
+      }
       const embed = new EmbedBuilder()
         .setTitle(`📝 Quiz: ${topic} (Câu ${qIndex + 1}/${questions.length})`)
         .setDescription(

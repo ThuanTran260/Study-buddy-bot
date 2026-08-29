@@ -20,7 +20,7 @@ describe('parseAIJsonResponse', () => {
     const parsed = parseAIJsonResponse(validJson);
     expect(parsed).not.toBeNull();
     expect(parsed?.length).toBe(1);
-    expect(parsed?.[0].correctOption).toBe('A');
+    expect(parsed?.[0]?.correctOption).toBe('A');
   });
 
   it('rejects invalid option formats', () => {

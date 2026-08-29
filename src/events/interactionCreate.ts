@@ -135,7 +135,14 @@ export async function execute(interaction: Interaction): Promise<void> {
 
         // 4. Kiểm tra xem tin nhắn có chứa mã Mermaid không
         const originalEmbed = interaction.message.embeds[0];
-        const originalText = originalEmbed?.description || '';
+        if (!originalEmbed) {
+          await interaction.reply({
+            content: '❌ Không tìm thấy nội dung nhúng gốc trong tin nhắn này.',
+            ephemeral: true,
+          });
+          return;
+        }
+        const originalText = originalEmbed.description || '';
         const mermaidCode = extractMermaidCode(originalText);
 
         if (mermaidCode) {

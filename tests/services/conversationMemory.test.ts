@@ -31,8 +31,8 @@ describe('conversationMemory', () => {
     const history = await getConversationHistory('user-1');
     expect(history.length).toBe(10);
     // Oldest messages (1 and 2) should have been evicted
-    expect(history[0].content).toBe('Message 3');
-    expect(history[9].content).toBe('Message 12');
+    expect(history[0]?.content).toBe('Message 3');
+    expect(history[9]?.content).toBe('Message 12');
   });
 
   it('clears conversation on clearConversation call', async () => {
@@ -66,7 +66,7 @@ describe('conversationMemory', () => {
 
       const history = await getConversationHistory('user-fallback-1');
       expect(history.length).toBe(1);
-      expect(history[0].content).toBe('Tin nhắn khi Redis hết quota');
+      expect(history[0]?.content).toBe('Tin nhắn khi Redis hết quota');
 
       expect(await getConversationMessageCount('user-fallback-1')).toBe(1);
 

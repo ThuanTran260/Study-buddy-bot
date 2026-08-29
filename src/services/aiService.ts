@@ -68,8 +68,9 @@ export function extractHttpStatus(error: unknown): number | null {
 
   const msg = error instanceof Error ? error.message : String(error);
   const match = msg.match(/"code"\s*:\s*(\d{3})/i) || msg.match(/\b(4\d\d|5\d\d)\b/);
-  if (match) {
-    const parsed = parseInt(match[1], 10);
+  const rawCode = match?.[1];
+  if (rawCode) {
+    const parsed = parseInt(rawCode, 10);
     if (!isNaN(parsed)) return parsed;
   }
 
@@ -167,8 +168,7 @@ async function callAI({
       const candidateModels = resolveCandidateModels('gemini', env.aiModel);
 
       let lastGeminiError: unknown = null;
-      for (let i = 0; i < candidateModels.length; i++) {
-        const candidateModel = candidateModels[i];
+      for (const [i, candidateModel] of candidateModels.entries()) {
         try {
           const response = await geminiClient.models.generateContent({
             model: candidateModel,

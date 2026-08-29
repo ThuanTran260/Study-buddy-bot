@@ -18,8 +18,11 @@ export function extractMermaidCode(text: string): string | null {
 
   // 1. Tìm trong khối code ```mermaid ... ```
   const blockMatch = text.match(/```mermaid\s*([\s\S]*?)```/i);
-  if (blockMatch && blockMatch[1].trim()) {
-    return blockMatch[1].trim();
+  if (blockMatch) {
+    const code = blockMatch[1];
+    if (code && code.trim()) {
+      return code.trim();
+    }
   }
 
   // 2. Tìm khối bắt đầu bằng từ khóa Mermaid kinh điển

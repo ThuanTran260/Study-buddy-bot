@@ -29,9 +29,9 @@ describe('Leaderboard Service Logic', () => {
 
       const result = await getLeaderboardData(['u1', 'u2'], 'streak');
       expect(result.length).toBe(2);
-      expect(result[0].username).toBe('Alice');
-      expect(result[0].score).toBe(10);
-      expect(result[0].extraText).toContain('10 ngày liên tiếp');
+      expect(result[0]?.username).toBe('Alice');
+      expect(result[0]?.score).toBe(10);
+      expect(result[0]?.extraText).toContain('10 ngày liên tiếp');
     });
   });
 
@@ -56,9 +56,9 @@ describe('Leaderboard Service Logic', () => {
 
       const result = await getLeaderboardData(['u1', 'u2'], 'quiz');
       expect(result.length).toBe(2);
-      expect(result[0].username).toBe('Alice');
-      expect(result[0].score).toBe(2);
-      expect(result[0].extraText).toContain('90%');
+      expect(result[0]?.username).toBe('Alice');
+      expect(result[0]?.score).toBe(2);
+      expect(result[0]?.extraText).toContain('90%');
     });
   });
 
@@ -75,8 +75,8 @@ describe('Leaderboard Service Logic', () => {
 
       const result = await getLeaderboardData(['u1'], 'pomodoro');
       expect(result.length).toBe(1);
-      expect(result[0].score).toBe(75);
-      expect(result[0].extraText).toContain('1.3 giờ (75 phút)');
+      expect(result[0]?.score).toBe(75);
+      expect(result[0]?.extraText).toContain('1.3 giờ (75 phút)');
     });
   });
 
@@ -97,8 +97,8 @@ describe('Leaderboard Service Logic', () => {
 
       const result = await getLeaderboardData(['u1'], 'flashcard');
       expect(result.length).toBe(1);
-      expect(result[0].score).toBe(3);
-      expect(result[0].extraText).toContain('3 thẻ thuộc lòng');
+      expect(result[0]?.score).toBe(3);
+      expect(result[0]?.extraText).toContain('3 thẻ thuộc lòng');
     });
   });
 });

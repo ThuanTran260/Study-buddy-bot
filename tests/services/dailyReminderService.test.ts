@@ -35,8 +35,8 @@ describe('dailyReminderService', () => {
     it('creates an ActionRow containing disable button with customId disable_daily_reminder', () => {
       const row = buildDailyReminderComponents();
       expect(row.components.length).toBe(1);
-      expect((row.components[0].data as any).custom_id).toBe('disable_daily_reminder');
-      expect((row.components[0].data as any).label).toContain('Tắt Nhắc Nhở');
+      expect((row.components[0]?.data as any).custom_id).toBe('disable_daily_reminder');
+      expect((row.components[0]?.data as any).label).toContain('Tắt Nhắc Nhở');
     });
   });
 

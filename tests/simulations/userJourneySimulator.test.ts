@@ -76,7 +76,7 @@ describe('🌟 END-TO-END USER JOURNEY SIMULATION HARNESS (10 SCENARIOS)', () =>
     expect(parsed).not.toBeNull();
     expect(parsed?.flashcards.length).toBe(2);
     expect(parsed?.quiz.length).toBe(1);
-    expect(parsed?.quiz[0].options.length).toBe(4);
+    expect(parsed?.quiz[0]?.options.length).toBe(4);
 
     // Kích hoạt Streak
     const streakResult = calculateStreakUpdate(null, new Date());

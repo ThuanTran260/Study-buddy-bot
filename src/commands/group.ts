@@ -293,18 +293,25 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
         if (remainingMembers.length > 0) {
           const nextOwner = remainingMembers[0];
-          await prisma.$transaction([
-            prisma.studyGroupMember.delete({ where: { id: membership.id } }),
-            prisma.studyGroup.update({
-              where: { id: group.id },
-              data: { ownerId: nextOwner.userId },
-            }),
-          ]);
+          if (nextOwner) {
+            await prisma.$transaction([
+              prisma.studyGroupMember.delete({ where: { id: membership.id } }),
+              prisma.studyGroup.update({
+                where: { id: group.id },
+                data: { ownerId: nextOwner.userId },
+              }),
+            ]);
 
-          await interaction.reply({
-            content: `👋 Bạn đã rời nhóm **"${group.name}"**. Quyền Trưởng nhóm đã được tự động chuyển giao cho thành viên kỳ cựu tiếp theo!`,
-            ephemeral: true,
-          });
+            await interaction.reply({
+              content: `👋 Bạn đã rời nhóm **"${group.name}"**. Quyền Trưởng nhóm đã được tự động chuyển giao cho thành viên kỳ cựu tiếp theo!`,
+              ephemeral: true,
+            });
+          } else {
+            await interaction.reply({
+              content: '❌ Không tìm thấy thành viên kế nhiệm để chuyển giao quyền trưởng nhóm.',
+              ephemeral: true,
+            });
+          }
         } else {
           // Nhóm không còn ai -> Xóa nhóm
           await prisma.studyGroup.delete({ where: { id: group.id } });

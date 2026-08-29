@@ -61,7 +61,7 @@ describe('aiSchema Zod Validation', () => {
     expect(result?.summary).toBe('This is a summary of the text.');
     expect(result?.flashcards.length).toBe(1);
     expect(result?.quiz.length).toBe(1);
-    expect(result?.quiz[0].correctOption).toBe('B');
+    expect(result?.quiz[0]?.correctOption).toBe('B');
   });
 
   it('should return null for completely malformed JSON', () => {

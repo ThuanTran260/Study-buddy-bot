@@ -91,6 +91,7 @@ export const QuizResponseSchema = z.preprocess(
         const optObj = rec.options as Record<string, unknown>;
         for (let i = 0; i < labels.length; i++) {
           const l = labels[i];
+          if (!l) continue;
           const optVal = optObj[l] || optObj[l.toLowerCase()];
           if (optVal) {
             options.push({ label: l, text: asText(optVal).trim() });
@@ -100,6 +101,7 @@ export const QuizResponseSchema = z.preprocess(
 
       while (options.length > 0 && options.length < 4) {
         const nextLabel = labels[options.length];
+        if (!nextLabel) break;
         options.push({
           label: nextLabel,
           text: options.length === 2 ? 'Không có đáp án phù hợp' : 'Cả hai phương án trên đều sai',
@@ -335,6 +337,7 @@ export const StudyPackSchema = z.preprocess(
         const optObj = q.options as Record<string, unknown>;
         for (let i = 0; i < labels.length; i++) {
           const l = labels[i];
+          if (!l) continue;
           const optVal = optObj[l] || optObj[l.toLowerCase()];
           if (optVal) {
             options.push({
@@ -347,6 +350,7 @@ export const StudyPackSchema = z.preprocess(
 
       while (options.length > 0 && options.length < 4) {
         const nextLabel = labels[options.length];
+        if (!nextLabel) break;
         options.push({
           label: nextLabel,
           text: options.length === 2 ? 'Không có đáp án phù hợp' : 'Cả hai phương án trên đều sai',
