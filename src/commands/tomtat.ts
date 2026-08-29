@@ -9,7 +9,11 @@ export const data = new SlashCommandBuilder()
   .setName('tomtat')
   .setDescription('Tóm tắt đoạn văn bản dài thành các điểm chính')
   .addStringOption((opt) =>
-    opt.setName('noi_dung').setDescription('Văn bản cần tóm tắt (tối đa 4000 ký tự)').setRequired(true).setMaxLength(4000)
+    opt
+      .setName('noi_dung')
+      .setDescription('Văn bản cần tóm tắt (tối đa 4000 ký tự)')
+      .setRequired(true)
+      .setMaxLength(4000)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -48,9 +52,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }
   } catch (error) {
     const errorStr = (error as Error).message || String(error);
-    const msg = errorStr === 'AI_TIMEOUT'
-      ? '⏱️ AI mất quá nhiều thời gian phản hồi (> 25s). Vui lòng thử lại sau.'
-      : '❌ Không thể tóm tắt văn bản lúc này. Vui lòng thử lại sau.';
+    const msg =
+      errorStr === 'AI_TIMEOUT'
+        ? '⏱️ AI mất quá nhiều thời gian phản hồi (> 25s). Vui lòng thử lại sau.'
+        : '❌ Không thể tóm tắt văn bản lúc này. Vui lòng thử lại sau.';
     logger.error('Command /tomtat failed', { userId: interaction.user.id, error: String(error) });
     await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
   }

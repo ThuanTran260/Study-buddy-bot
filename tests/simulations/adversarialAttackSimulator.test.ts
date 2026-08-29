@@ -1,7 +1,12 @@
 import http from 'http';
 import { sanitizeDiscordOutput, isPrintableText } from '../../src/utils/sanitize';
 import { parseStudyPackResponse } from '../../src/services/aiService';
-import { startHealthServer, closeHealthServer, registerHealthClient, resetHealthRateLimiter } from '../../src/utils/healthServer';
+import {
+  startHealthServer,
+  closeHealthServer,
+  registerHealthClient,
+  resetHealthRateLimiter,
+} from '../../src/utils/healthServer';
 import { checkDbRateLimit } from '../../src/services/dbRateLimiter';
 import { execute as flashcardExecute } from '../../src/commands/flashcard';
 import { extractDocumentContent } from '../../src/services/documentService';
@@ -59,7 +64,8 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (10 REAL-WORLD AT
   // ATTACK 1: PROMPT INJECTION & GHOST MENTION ATTACK
   // =========================================================================
   it('Attack 1 [Ghost Ping & Mention Injection]: Kẻ tấn công chèn @everyone và <@&AdminRole> -> Bị vô hiệu hóa bằng Zero-width space', () => {
-    const maliciousPayload = 'Chúc mừng bạn đã trúng thưởng! @everyone Hãy nhận quà tại <@&123456789012345678> ngay!';
+    const maliciousPayload =
+      'Chúc mừng bạn đã trúng thưởng! @everyone Hãy nhận quà tại <@&123456789012345678> ngay!';
     const sanitized = sanitizeDiscordOutput(maliciousPayload);
 
     expect(sanitized).not.toContain('@everyone');
@@ -211,7 +217,12 @@ describe('🛡️ ADVERSARIAL AI BOT ATTACK SIMULATION HARNESS (10 REAL-WORLD AT
     const oversizeBytes = 1.5 * 1024 * 1024; // 1.5MB
 
     await expect(
-      extractDocumentContent(null, 'https://cdn.discordapp.com/large.txt', 'large.txt', oversizeBytes)
+      extractDocumentContent(
+        null,
+        'https://cdn.discordapp.com/large.txt',
+        'large.txt',
+        oversizeBytes
+      )
     ).rejects.toThrow('FILE_TOO_LARGE');
   });
 });

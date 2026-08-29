@@ -7,9 +7,7 @@ export function buildDailyReminderEmbed(
   dueCount: number,
   deckSummaries: Array<{ name: string; count: number }>
 ): EmbedBuilder {
-  const deckListText = deckSummaries
-    .map((d) => `• **${d.name}**: ${d.count} thẻ`)
-    .join('\n');
+  const deckListText = deckSummaries.map((d) => `• **${d.name}**: ${d.count} thẻ`).join('\n');
 
   return new EmbedBuilder()
     .setTitle('📬 Nhắc Nhở Ôn Tập Flashcard Buổi Sáng')

@@ -3,7 +3,13 @@ export interface ScoreResult {
   grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
 }
 
-export function calculateScore({ total, correct }: { total: number; correct: number }): ScoreResult {
+export function calculateScore({
+  total,
+  correct,
+}: {
+  total: number;
+  correct: number;
+}): ScoreResult {
   const percentage = total === 0 ? 0 : Math.round((correct / total) * 100);
   let grade: ScoreResult['grade'];
   if (percentage === 100) grade = 'S';

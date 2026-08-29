@@ -11,7 +11,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const embed = await buildWeeklyDigestEmbed(interaction.user.id);
     if (!embed) {
       await interaction.reply({
-        content: '📝 Bạn chưa có dữ liệu học tập nào trong 7 ngày qua. Hãy làm vài bài `/quiz` hoặc bật `/pomodoro` nhé!',
+        content:
+          '📝 Bạn chưa có dữ liệu học tập nào trong 7 ngày qua. Hãy làm vài bài `/quiz` hoặc bật `/pomodoro` nhé!',
         ephemeral: true,
       });
       return;

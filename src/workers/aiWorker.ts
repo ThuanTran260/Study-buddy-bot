@@ -97,12 +97,16 @@ async function processDocumentJob(job: QueueJob<AiDocumentJobData>): Promise<voi
     const errorMsg = error instanceof Error && error.message ? error.message : String(error);
 
     if (errorMsg === 'AI_TIMEOUT') {
-      userFriendlyMsg = '⏱️ AI mất quá nhiều thời gian phản hồi. Vui lòng thử lại với tài liệu ngắn hơn.';
+      userFriendlyMsg =
+        '⏱️ AI mất quá nhiều thời gian phản hồi. Vui lòng thử lại với tài liệu ngắn hơn.';
     } else if (errorMsg === 'AI_PARSING_FAILED') {
-      userFriendlyMsg = '⚠️ AI chưa thể bóc tách nội dung tài liệu này thành Study Pack. Vui lòng kiểm tra lại văn bản.';
+      userFriendlyMsg =
+        '⚠️ AI chưa thể bóc tách nội dung tài liệu này thành Study Pack. Vui lòng kiểm tra lại văn bản.';
     }
 
-    await webhookClient.editMessage('@original', { content: userFriendlyMsg, embeds: [] }).catch(() => {});
+    await webhookClient
+      .editMessage('@original', { content: userFriendlyMsg, embeds: [] })
+      .catch(() => {});
   } finally {
     webhookClient.destroy();
   }

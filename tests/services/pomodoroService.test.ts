@@ -1,4 +1,8 @@
-import { PomodoroStateMachine, PomodoroStatus, safeSetVoiceStatus } from '../../src/services/pomodoroService';
+import {
+  PomodoroStateMachine,
+  PomodoroStatus,
+  safeSetVoiceStatus,
+} from '../../src/services/pomodoroService';
 import { VoiceChannel } from 'discord.js';
 
 describe('PomodoroStateMachine', () => {
@@ -107,9 +111,15 @@ describe('Pomodoro Redis & In-Memory State Resilience', () => {
     expect(retrieved?.channelId).toBe('chan-1');
 
     // Giả lập Redis ném lỗi Quota Exceeded
-    jest.spyOn(redisClient, 'hset').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
-    jest.spyOn(redisClient, 'hget').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
-    jest.spyOn(redisClient, 'hgetall').mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+    jest
+      .spyOn(redisClient, 'hset')
+      .mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+    jest
+      .spyOn(redisClient, 'hget')
+      .mockRejectedValue(new Error('ERR max daily request limit exceeded'));
+    jest
+      .spyOn(redisClient, 'hgetall')
+      .mockRejectedValue(new Error('ERR max daily request limit exceeded'));
 
     // Vẫn lưu và đọc thành công từ In-Memory Store
     await expect(savePomodoroState('chan-fallback', sampleState)).resolves.not.toThrow();

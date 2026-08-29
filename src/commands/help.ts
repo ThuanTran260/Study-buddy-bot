@@ -7,7 +7,9 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const embed = new EmbedBuilder()
     .setTitle('📚 Study Buddy — Hướng Dẫn Sử Dụng Toàn Diện')
-    .setDescription('Dưới đây là danh sách các tính năng được phân loại theo từng nhóm công cụ học tập:')
+    .setDescription(
+      'Dưới đây là danh sách các tính năng được phân loại theo từng nhóm công cụ học tập:'
+    )
     .setColor(0x5865f2)
     .addFields(
       {

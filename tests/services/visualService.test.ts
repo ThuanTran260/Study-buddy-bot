@@ -15,13 +15,15 @@ describe('visualService', () => {
 
   describe('extractMermaidCode', () => {
     it('extracts code from markdown block ```mermaid ... ```', () => {
-      const text = 'Chào bạn, đây là sơ đồ:\n```mermaid\nsequenceDiagram\n  Client->>Server: Login\n```\nChúc bạn học tốt!';
+      const text =
+        'Chào bạn, đây là sơ đồ:\n```mermaid\nsequenceDiagram\n  Client->>Server: Login\n```\nChúc bạn học tốt!';
       const extracted = extractMermaidCode(text);
       expect(extracted).toBe('sequenceDiagram\n  Client->>Server: Login');
     });
 
     it('extracts un-fenced sequenceDiagram keyword directly from raw text', () => {
-      const text = 'Chào bạn!\nsequenceDiagram\n  autonumber\n  Client->>Server: Login\n\nGiải thích...';
+      const text =
+        'Chào bạn!\nsequenceDiagram\n  autonumber\n  Client->>Server: Login\n\nGiải thích...';
       const extracted = extractMermaidCode(text);
       expect(extracted).toContain('sequenceDiagram');
       expect(extracted).toContain('Client->>Server: Login');

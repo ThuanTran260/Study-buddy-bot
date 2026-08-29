@@ -1,7 +1,11 @@
 import { extractValidJson, parseStudyPackResponse } from '../../src/services/aiService';
 import { calculateSM2 } from '../../src/services/sm2Service';
 import { calculateStreakUpdate } from '../../src/utils/dateUtils';
-import { getConversationHistory, addToConversation, clearConversation } from '../../src/services/conversationMemory';
+import {
+  getConversationHistory,
+  addToConversation,
+  clearConversation,
+} from '../../src/services/conversationMemory';
 import { resolveGuildId } from '../../src/utils/guildResolver';
 import { cleanupOldAiUsageLogs } from '../../src/services/cleanupService';
 import { prisma } from '../../src/config/prisma';
@@ -203,7 +207,8 @@ describe('🌟 END-TO-END USER JOURNEY SIMULATION HARNESS (10 SCENARIOS)', () =>
   // JOURNEY 10: AUTOCOMPLETE CHOICES CAP & TRUNCATION
   // =========================================================================
   it('Journey 10: Cắt gọt nhãn label bộ thẻ dưới 100 ký tự và tối đa 25 choices', () => {
-    const longName = 'Lý Thuyết Xác Suất Thống Kê Nâng Cao Dành Cho Khoa Học Dữ Liệu Và Trí Tuệ Nhân Tạo';
+    const longName =
+      'Lý Thuyết Xác Suất Thống Kê Nâng Cao Dành Cho Khoa Học Dữ Liệu Và Trí Tuệ Nhân Tạo';
     const label = `${longName} (12 thẻ • 🔥 4 cần ôn)`.slice(0, 100);
 
     expect(label.length).toBeLessThanOrEqual(100);

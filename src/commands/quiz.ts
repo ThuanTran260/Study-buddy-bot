@@ -17,8 +17,12 @@ import { logger } from '../utils/logger';
 export const data = new SlashCommandBuilder()
   .setName('quiz')
   .setDescription('Tạo bộ câu hỏi trắc nghiệm AI và bấm nút trả lời')
-  .addStringOption((opt) => opt.setName('chu_de').setDescription('Chủ đề trắc nghiệm').setRequired(true).setMaxLength(200))
-  .addIntegerOption((opt) => opt.setName('so_cau').setDescription('Số câu hỏi (1 - 5)').setMinValue(1).setMaxValue(5));
+  .addStringOption((opt) =>
+    opt.setName('chu_de').setDescription('Chủ đề trắc nghiệm').setRequired(true).setMaxLength(200)
+  )
+  .addIntegerOption((opt) =>
+    opt.setName('so_cau').setDescription('Số câu hỏi (1 - 5)').setMinValue(1).setMaxValue(5)
+  );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const userRecord = await prisma.user.upsert({
@@ -38,7 +42,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const count = interaction.options.getInteger('so_cau') ?? 3;
 
   if (!isValidQuizTopic(topic)) {
-    await interaction.reply({ content: '❌ Chủ đề không hợp lệ (độ dài 1 - 200 ký tự).', ephemeral: true });
+    await interaction.reply({
+      content: '❌ Chủ đề không hợp lệ (độ dài 1 - 200 ký tự).',
+      ephemeral: true,
+    });
     return;
   }
 
@@ -49,7 +56,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const questions = parseAIJsonResponse(rawAiJson);
 
     if (!questions || questions.length === 0) {
-      await interaction.editReply({ content: '❌ AI không thể tạo bộ câu hỏi lúc này. Vui lòng thử chủ đề khác.' });
+      await interaction.editReply({
+        content: '❌ AI không thể tạo bộ câu hỏi lúc này. Vui lòng thử chủ đề khác.',
+      });
       return;
     }
 
@@ -80,7 +89,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const q = questions[qIndex];
       const embed = new EmbedBuilder()
         .setTitle(`📝 Quiz: ${topic} (Câu ${qIndex + 1}/${questions.length})`)
-        .setDescription(`**${q.question}**\n\n` + q.options.map((o) => `**${o.label}.** ${o.text}`).join('\n'))
+        .setDescription(
+          `**${q.question}**\n\n` + q.options.map((o) => `**${o.label}.** ${o.text}`).join('\n')
+        )
         .setColor(0x5865f2)
         .setFooter({ text: `Người làm: ${interaction.user.username} • Thời gian trả lời: 30s` });
 
@@ -126,7 +137,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .setDescription(`Đáp án đúng: **${q.correctOption}**\n*Giải thích:* ${q.explanation}`)
           .setColor(isCorrect ? 0x57f287 : 0xed4245);
 
-        await interaction.followUp({ embeds: [feedbackEmbed], ephemeral: true, allowedMentions: { parse: [] } });
+        await interaction.followUp({
+          embeds: [feedbackEmbed],
+          ephemeral: true,
+          allowedMentions: { parse: [] },
+        });
 
         currentIndex++;
         if (currentIndex < questions.length) {
@@ -143,16 +158,25 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
           const finalEmbed = new EmbedBuilder()
             .setTitle(`🎉 Kết quả Quiz: ${topic}`)
-            .setDescription(`Điểm số: **${correctCount}/${questions.length}** (${score.percentage}%)\nXếp loại: **Hạng ${score.grade}**\n\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`)
+            .setDescription(
+              `Điểm số: **${correctCount}/${questions.length}** (${score.percentage}%)\nXếp loại: **Hạng ${score.grade}**\n\n🔥 **Chuỗi Streak học tập đã được cập nhật!**`
+            )
             .setColor(score.percentage >= 70 ? 0x57f287 : 0xfee75c);
 
-          await interaction.editReply({ embeds: [finalEmbed], components: [], allowedMentions: { parse: [] } });
+          await interaction.editReply({
+            embeds: [finalEmbed],
+            components: [],
+            allowedMentions: { parse: [] },
+          });
         }
       });
 
       collector.on('end', async (_, reason) => {
         if (reason === 'time' && currentIndex === qIndex) {
-          await interaction.followUp({ content: '⏱️ Hết 30s! Câu hỏi đã bị bỏ qua.', ephemeral: true });
+          await interaction.followUp({
+            content: '⏱️ Hết 30s! Câu hỏi đã bị bỏ qua.',
+            ephemeral: true,
+          });
           currentIndex++;
           if (currentIndex < questions.length) {
             await sendQuestion(currentIndex);
@@ -166,9 +190,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await sendQuestion(0);
   } catch (error) {
     const errorStr = (error as Error).message || String(error);
-    const msg = errorStr === 'AI_TIMEOUT'
-      ? '⏱️ AI mất quá nhiều thời gian tạo bộ câu hỏi (> 25s). Vui lòng thử lại sau.'
-      : '❌ Có lỗi xảy ra khi tạo quiz. Vui lòng thử lại sau.';
+    const msg =
+      errorStr === 'AI_TIMEOUT'
+        ? '⏱️ AI mất quá nhiều thời gian tạo bộ câu hỏi (> 25s). Vui lòng thử lại sau.'
+        : '❌ Có lỗi xảy ra khi tạo quiz. Vui lòng thử lại sau.';
     logger.error('Error in /quiz', { error: String(error) });
     await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
   }

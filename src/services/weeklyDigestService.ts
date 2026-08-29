@@ -51,10 +51,26 @@ export async function buildWeeklyDigestEmbed(discordUserId: string): Promise<Emb
     .setDescription(`Dưới đây là tổng kết nỗ lực học tập của bạn trong **7 ngày qua**:`)
     .setColor(0xfee75c)
     .addFields(
-      { name: '🔥 Chuỗi Ngày Học (Streak)', value: `**${user.streakCount} ngày liên tiếp**`, inline: true },
-      { name: '🍅 Thời Gian Pomodoro', value: `**${(pomodoroMinutes / 60).toFixed(1)} giờ** (${pomodoroMinutes}p)`, inline: true },
-      { name: '📝 Bài Làm Quiz', value: `**${totalQuizzes} bài** (Chính xác: **${accuracy}%**)`, inline: true },
-      { name: '🗂️ Thẻ Nhớ Cần Ôn', value: `⏰ **${dueCards} thẻ** đang chờ bạn ôn tập!`, inline: false }
+      {
+        name: '🔥 Chuỗi Ngày Học (Streak)',
+        value: `**${user.streakCount} ngày liên tiếp**`,
+        inline: true,
+      },
+      {
+        name: '🍅 Thời Gian Pomodoro',
+        value: `**${(pomodoroMinutes / 60).toFixed(1)} giờ** (${pomodoroMinutes}p)`,
+        inline: true,
+      },
+      {
+        name: '📝 Bài Làm Quiz',
+        value: `**${totalQuizzes} bài** (Chính xác: **${accuracy}%**)`,
+        inline: true,
+      },
+      {
+        name: '🗂️ Thẻ Nhớ Cần Ôn',
+        value: `⏰ **${dueCards} thẻ** đang chờ bạn ôn tập!`,
+        inline: false,
+      }
     )
     .setFooter({ text: 'Chúc bạn một tuần mới học tập thật hiệu quả! • Study Buddy' })
     .setTimestamp();
@@ -86,7 +102,10 @@ export async function sendWeeklyDigestToAllUsers(client: Client): Promise<number
         }
       } catch (err) {
         // Bỏ qua an toàn nếu người dùng tắt DM
-        logger.debug('Cannot send weekly digest DM to user', { discordUserId: user.discordUserId, err: String(err) });
+        logger.debug('Cannot send weekly digest DM to user', {
+          discordUserId: user.discordUserId,
+          err: String(err),
+        });
       }
     }
 

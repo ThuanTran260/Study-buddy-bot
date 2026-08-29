@@ -1,4 +1,8 @@
-import { safeParseAIJson, VisualResponseSchema, VisualResponseType } from '../../src/utils/aiSchema';
+import {
+  safeParseAIJson,
+  VisualResponseSchema,
+  VisualResponseType,
+} from '../../src/utils/aiSchema';
 import { redisClient } from '../../src/config/redis';
 
 describe('Visual Edge Cases & Defensive Architecture', () => {

@@ -36,22 +36,27 @@ export type Env = z.infer<typeof envSchema>;
 export function parseEnv(raw: Record<string, unknown>): Env {
   const result = envSchema.safeParse(raw);
   if (!result.success) {
-    const missing = result.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
-    throw new Error(`❌ Missing/invalid environment variables:\n${missing}\n\nCopy .env.example to .env and fill in the values.`);
+    const missing = result.error.issues
+      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .join('\n');
+    throw new Error(
+      `❌ Missing/invalid environment variables:\n${missing}\n\nCopy .env.example to .env and fill in the values.`
+    );
   }
   return result.data;
 }
 
-export const env = process.env.NODE_ENV === 'test'
-  ? ({
-      discordToken: process.env.DISCORD_TOKEN || 'mock_token',
-      clientId: process.env.CLIENT_ID || 'mock_client_id',
-      guildId: process.env.GUILD_ID,
-      databaseUrl: process.env.DATABASE_URL || 'postgresql://mock',
-      aiProvider: 'openai' as const,
-      aiApiKey: process.env.AI_API_KEY || 'mock_ai_key',
-      aiModel: 'gpt-4o-mini',
-      imageGenEnabled: false,
-      healthPort: 3000,
-    } as Env)
-  : parseEnv(process.env as Record<string, unknown>);
+export const env =
+  process.env.NODE_ENV === 'test'
+    ? ({
+        discordToken: process.env.DISCORD_TOKEN || 'mock_token',
+        clientId: process.env.CLIENT_ID || 'mock_client_id',
+        guildId: process.env.GUILD_ID,
+        databaseUrl: process.env.DATABASE_URL || 'postgresql://mock',
+        aiProvider: 'openai' as const,
+        aiApiKey: process.env.AI_API_KEY || 'mock_ai_key',
+        aiModel: 'gpt-4o-mini',
+        imageGenEnabled: false,
+        healthPort: 3000,
+      } as Env)
+    : parseEnv(process.env);

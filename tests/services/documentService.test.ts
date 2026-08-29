@@ -62,11 +62,14 @@ describe('documentService', () => {
     });
 
     it('throws CONTENT_TOO_SHORT when text has less than 50 characters', async () => {
-      await expect(extractDocumentContent('Ngắn quá', null, null, null)).rejects.toThrow('CONTENT_TOO_SHORT');
+      await expect(extractDocumentContent('Ngắn quá', null, null, null)).rejects.toThrow(
+        'CONTENT_TOO_SHORT'
+      );
     });
 
     it('accepts valid direct text and extracts correctly', async () => {
-      const validText = 'Đây là một đoạn văn bản tài liệu học tập đầy đủ dài hơn 50 ký tự để kiểm tra tính năng trích xuất bài giảng.';
+      const validText =
+        'Đây là một đoạn văn bản tài liệu học tập đầy đủ dài hơn 50 ký tự để kiểm tra tính năng trích xuất bài giảng.';
       const result = await extractDocumentContent(validText, null, null, null);
       expect(result.text).toBe(validText);
       expect(result.truncated).toBe(false);

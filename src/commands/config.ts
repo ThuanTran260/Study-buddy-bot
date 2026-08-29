@@ -56,7 +56,10 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const guildId = interaction.guildId;
   if (!guildId) {
-    await interaction.reply({ content: '❌ Lệnh này chỉ có thể sử dụng trong Server.', ephemeral: true });
+    await interaction.reply({
+      content: '❌ Lệnh này chỉ có thể sử dụng trong Server.',
+      ephemeral: true,
+    });
     return;
   }
 

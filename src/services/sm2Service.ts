@@ -5,9 +5,9 @@
 
 export interface SM2Input {
   repetition: number; // Current repetition count (0 for new cards)
-  interval: number;   // Current interval in days (default: 1)
+  interval: number; // Current interval in days (default: 1)
   easeFactor: number; // Current Ease Factor (default: 2.5)
-  quality: number;    // User rating: 1 (Forget) | 3 (Hard) | 4 (Good) | 5 (Easy)
+  quality: number; // User rating: 1 (Forget) | 3 (Hard) | 4 (Good) | 5 (Easy)
 }
 
 export interface SM2Output {
@@ -17,12 +17,7 @@ export interface SM2Output {
   nextReviewAt: Date;
 }
 
-export function calculateSM2({
-  repetition,
-  interval,
-  easeFactor,
-  quality,
-}: SM2Input): SM2Output {
+export function calculateSM2({ repetition, interval, easeFactor, quality }: SM2Input): SM2Output {
   // 1. Tính toán Ease Factor mới (EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
   // Ràng buộc: EF không bao giờ được nhỏ hơn 1.3
   const calculatedEF = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));

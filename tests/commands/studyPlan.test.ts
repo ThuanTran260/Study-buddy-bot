@@ -27,9 +27,11 @@ jest.mock('../../src/config/prisma', () => ({
 }));
 
 jest.mock('../../src/services/aiService', () => ({
-  generateStudyPlanAI: jest.fn().mockResolvedValue(
-    '📊 **1. Đánh giá Hiệu suất**\n• Bạn duy trì tốt thói quen học.\n\n⚠️ **2. Ưu tiên Ôn tập**\n• Môn C++ cần làm thêm bài.\n\n📅 **3. Lịch trình 7 Ngày**\n• Thứ 2: Ôn C++\n• Thứ 3: Flashcard\n\n🍅 **4. Chiến lược Pomodoro**\n• 4 phiên/ngày.'
-  ),
+  generateStudyPlanAI: jest
+    .fn()
+    .mockResolvedValue(
+      '📊 **1. Đánh giá Hiệu suất**\n• Bạn duy trì tốt thói quen học.\n\n⚠️ **2. Ưu tiên Ôn tập**\n• Môn C++ cần làm thêm bài.\n\n📅 **3. Lịch trình 7 Ngày**\n• Thứ 2: Ôn C++\n• Thứ 3: Flashcard\n\n🍅 **4. Chiến lược Pomodoro**\n• 4 phiên/ngày.'
+    ),
 }));
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;

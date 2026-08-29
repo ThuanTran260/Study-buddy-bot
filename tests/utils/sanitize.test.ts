@@ -12,6 +12,8 @@ describe('sanitizeDiscordOutput', () => {
   });
 
   it('preserves clean text untouched', () => {
-    expect(sanitizeDiscordOutput('Học lập trình TypeScript rất vui!')).toBe('Học lập trình TypeScript rất vui!');
+    expect(sanitizeDiscordOutput('Học lập trình TypeScript rất vui!')).toBe(
+      'Học lập trình TypeScript rất vui!'
+    );
   });
 });

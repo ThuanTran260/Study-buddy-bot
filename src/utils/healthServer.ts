@@ -8,8 +8,8 @@ let serverInstance: http.Server | null = null;
 // 🛡️ DUAL-LAYER RATE LIMITER CHO /health (CHỐNG DOS & CHỐNG TRÀN RAM)
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_GLOBAL_REQUESTS_PER_WINDOW = 60; // Trần toàn cục: 60 req/phút cho toàn server
-const MAX_IP_REQUESTS_PER_WINDOW = 60;     // Trần mỗi IP: 60 req/phút/IP
-const MAX_MAP_ENTRIES = 100;               // Khóa cứng trần Map: Tối đa 100 IPs trong RAM
+const MAX_IP_REQUESTS_PER_WINDOW = 60; // Trần mỗi IP: 60 req/phút/IP
+const MAX_MAP_ENTRIES = 100; // Khóa cứng trần Map: Tối đa 100 IPs trong RAM
 
 let globalCount = 0;
 let globalResetTime = Date.now() + RATE_LIMIT_WINDOW_MS;
@@ -61,14 +61,17 @@ export function resetHealthRateLimiter(): void {
 
 // Dọn dẹp Map mỗi 5 phút để tránh memory leak
 if (process.env.NODE_ENV !== 'test') {
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, record] of ipRequestCounts.entries()) {
-      if (now > record.resetTime) {
-        ipRequestCounts.delete(ip);
+  const cleanupInterval = setInterval(
+    () => {
+      const now = Date.now();
+      for (const [ip, record] of ipRequestCounts.entries()) {
+        if (now > record.resetTime) {
+          ipRequestCounts.delete(ip);
+        }
       }
-    }
-  }, 5 * 60 * 1000);
+    },
+    5 * 60 * 1000
+  );
   cleanupInterval.unref();
 }
 

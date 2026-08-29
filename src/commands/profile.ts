@@ -60,7 +60,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     if (!user) {
       await interaction.reply({
-        content: '📝 Bạn chưa có dữ liệu học tập nào. Hãy bắt đầu bằng các lệnh `/quiz`, `/pomodoro` hoặc `/flashcard`!',
+        content:
+          '📝 Bạn chưa có dữ liệu học tập nào. Hãy bắt đầu bằng các lệnh `/quiz`, `/pomodoro` hoặc `/flashcard`!',
         ephemeral: true,
       });
       return;
@@ -149,6 +150,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     logger.error('Error executing profile command', { discordUserId, error: String(error) });
-    await interaction.reply({ content: '❌ Có lỗi xảy ra khi tải hồ sơ học tập.', ephemeral: true });
+    await interaction.reply({
+      content: '❌ Có lỗi xảy ra khi tải hồ sơ học tập.',
+      ephemeral: true,
+    });
   }
 }

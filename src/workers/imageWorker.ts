@@ -21,14 +21,8 @@ export interface AiImageJobData {
 async function processImageJob(job: QueueJob<AiImageJobData>): Promise<void> {
   logger.info(`Đang xử lý Job Image ${job.id} cho prompt: "${job.data.prompt.slice(0, 50)}..."`);
 
-  const {
-    userId,
-    prompt,
-    originalQuestion,
-    originalAnswer,
-    webhookToken,
-    applicationId,
-  } = job.data;
+  const { userId, prompt, originalQuestion, originalAnswer, webhookToken, applicationId } =
+    job.data;
 
   const webhookClient = new WebhookClient({
     id: applicationId,
@@ -79,10 +73,12 @@ async function processImageJob(job: QueueJob<AiImageJobData>): Promise<void> {
     logger.info(`Job Image ${job.id} hoàn thành thành công.`);
   } catch (error: unknown) {
     logger.error(`Job Image ${job.id} thất bại`, { error: String(error) });
-    await webhookClient.editMessage('@original', {
-      content: `❌ Có lỗi xảy ra khi tạo ảnh minh họa. Dưới đây là câu trả lời văn bản:\n\n${originalAnswer}`,
-      components: [],
-    }).catch(() => {});
+    await webhookClient
+      .editMessage('@original', {
+        content: `❌ Có lỗi xảy ra khi tạo ảnh minh họa. Dưới đây là câu trả lời văn bản:\n\n${originalAnswer}`,
+        components: [],
+      })
+      .catch(() => {});
   } finally {
     webhookClient.destroy();
   }

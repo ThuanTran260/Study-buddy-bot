@@ -153,11 +153,15 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   if (!interaction.guild) {
-    await interaction.reply({ content: '❌ Lệnh này chỉ dùng được trong Server.', ephemeral: true });
+    await interaction.reply({
+      content: '❌ Lệnh này chỉ dùng được trong Server.',
+      ephemeral: true,
+    });
     return;
   }
 
-  const type = interaction.options.getString('loai', true) as 'streak' | 'quiz' | 'pomodoro' | 'flashcard';
+  const type = interaction.options.getString('loai', true) as
+    'streak' | 'quiz' | 'pomodoro' | 'flashcard';
 
   await interaction.deferReply();
 
@@ -183,14 +187,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const info = typeTitles[type];
     const embed = new EmbedBuilder()
       .setTitle(`${info.emoji} ${info.title}`)
-      .setDescription(`Dưới đây là top 10 thành viên chăm chỉ nhất máy chủ **${interaction.guild.name}**:`)
+      .setDescription(
+        `Dưới đây là top 10 thành viên chăm chỉ nhất máy chủ **${interaction.guild.name}**:`
+      )
       .setColor(info.color)
       .setTimestamp();
 
     if (leaderboard.length === 0) {
       embed.addFields({
         name: 'Chưa có dữ liệu',
-        value: 'Chưa có thành viên nào ghi nhận hoạt động học tập ở hạng mục này. Hãy là người đầu tiên!',
+        value:
+          'Chưa có thành viên nào ghi nhận hoạt động học tập ở hạng mục này. Hãy là người đầu tiên!',
       });
     } else {
       const lines = leaderboard.map((entry, index) => {
@@ -205,7 +212,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     // Hiển thị vị trí của người gọi lệnh nếu có trong bảng
     const userIndex = leaderboard.findIndex((e) => e.discordUserId === interaction.user.id);
-    const userRankText = userIndex !== -1 ? `Thứ hạng của bạn: #${userIndex + 1}` : 'Bạn chưa có mặt trong top 10';
+    const userRankText =
+      userIndex !== -1 ? `Thứ hạng của bạn: #${userIndex + 1}` : 'Bạn chưa có mặt trong top 10';
     embed.setFooter({ text: `${userRankText} • Study Buddy Leaderboard` });
 
     await interaction.editReply({ embeds: [embed] });

@@ -1,5 +1,10 @@
 import { prisma } from '../config/prisma';
-import { generateStudyPackJson, parseStudyPackResponse, StudyPackData, QuizQuestionData } from './aiService';
+import {
+  generateStudyPackJson,
+  parseStudyPackResponse,
+  StudyPackData,
+  QuizQuestionData,
+} from './aiService';
 import { recordDbAiUsage } from './dbRateLimiter';
 import { recordUserActivity } from './streakService';
 import { isPrintableText, sanitizeUnicodeInput } from '../utils/sanitize';

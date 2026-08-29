@@ -1,8 +1,4 @@
-import {
-  SlashCommandBuilder,
-  ChatInputCommandInteraction,
-  EmbedBuilder,
-} from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { generateStudyPlanAI } from '../services/aiService';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
@@ -11,11 +7,15 @@ import { logger } from '../utils/logger';
 
 export const data = new SlashCommandBuilder()
   .setName('study-plan')
-  .setDescription('AI Cố vấn học tập phân tích dữ liệu 14 ngày qua và lập lộ trình học tập 7 ngày tối ưu')
+  .setDescription(
+    'AI Cố vấn học tập phân tích dữ liệu 14 ngày qua và lập lộ trình học tập 7 ngày tối ưu'
+  )
   .addStringOption((opt) =>
     opt
       .setName('muc_tieu')
-      .setDescription('Mục tiêu học tập cụ thể của bạn trong tuần tới (ví dụ: Thi giữa kỳ Giải tích, Học 50 từ IELTS)')
+      .setDescription(
+        'Mục tiêu học tập cụ thể của bạn trong tuần tới (ví dụ: Thi giữa kỳ Giải tích, Học 50 từ IELTS)'
+      )
       .setRequired(false)
       .setMaxLength(200)
   );
@@ -92,7 +92,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       }),
     ]);
 
-    const hasNoData = quizSessions.length === 0 && weakFlashcards.length === 0 && pomodoroSessions.length === 0 && totalDecks === 0;
+    const hasNoData =
+      quizSessions.length === 0 &&
+      weakFlashcards.length === 0 &&
+      pomodoroSessions.length === 0 &&
+      totalDecks === 0;
 
     if (hasNoData && !userGoal) {
       const guidanceEmbed = new EmbedBuilder()
@@ -116,20 +120,25 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const totalPomoMinutes = pomodoroSessions.reduce((sum, p) => sum + p.workMinutes, 0);
     const totalPomoHours = (totalPomoMinutes / 60).toFixed(1);
 
-    const quizSummary = quizSessions.length > 0
-      ? quizSessions
-          .map((q) => {
-            const pct = q.totalQuestions > 0 ? Math.round((q.correctAnswers / q.totalQuestions) * 100) : 0;
-            return `• Chủ đề "${q.topic}": ${q.correctAnswers}/${q.totalQuestions} câu đúng (${pct}%)${pct < 60 ? ' ⚠️ (Cần cải thiện)' : ' ✅'}`;
-          })
-          .join('\n')
-      : '• Chưa làm bài Quiz nào trong 14 ngày qua.';
+    const quizSummary =
+      quizSessions.length > 0
+        ? quizSessions
+            .map((q) => {
+              const pct =
+                q.totalQuestions > 0 ? Math.round((q.correctAnswers / q.totalQuestions) * 100) : 0;
+              return `• Chủ đề "${q.topic}": ${q.correctAnswers}/${q.totalQuestions} câu đúng (${pct}%)${pct < 60 ? ' ⚠️ (Cần cải thiện)' : ' ✅'}`;
+            })
+            .join('\n')
+        : '• Chưa làm bài Quiz nào trong 14 ngày qua.';
 
-    const flashcardSummary = weakFlashcards.length > 0
-      ? weakFlashcards
-          .map((f) => `• [Bộ ${f.deck.name}] "${f.front.slice(0, 40)}" (Độ nhớ EF: ${f.easeFactor})`)
-          .join('\n')
-      : '• Không có thẻ Flashcard nào bị đánh giá khó/quên gần đây.';
+    const flashcardSummary =
+      weakFlashcards.length > 0
+        ? weakFlashcards
+            .map(
+              (f) => `• [Bộ ${f.deck.name}] "${f.front.slice(0, 40)}" (Độ nhớ EF: ${f.easeFactor})`
+            )
+            .join('\n')
+        : '• Không có thẻ Flashcard nào bị đánh giá khó/quên gần đây.';
 
     const dataContext = `
 [THÔNG TIN SINH VIÊN]
@@ -163,13 +172,11 @@ ${flashcardSummary}
       .setTitle(`📋 Lộ Trình Học Tập Cá Nhân Hóa 7 Ngày: @${interaction.user.username}`)
       .setDescription(planText.slice(0, 4000))
       .setColor(0x57f287)
-      .addFields(
-        {
-          name: '📈 Tóm Tắt Dữ Liệu Đầu Vào',
-          value: `🔥 **Streak:** ${user.streakCount} ngày | 📝 **Quiz:** ${quizSessions.length} bài | 🍅 **Tập trung:** ${totalPomoHours}h | 🗂️ **Thẻ yếu:** ${weakFlashcards.length}`,
-          inline: false,
-        }
-      )
+      .addFields({
+        name: '📈 Tóm Tắt Dữ Liệu Đầu Vào',
+        value: `🔥 **Streak:** ${user.streakCount} ngày | 📝 **Quiz:** ${quizSessions.length} bài | 🍅 **Tập trung:** ${totalPomoHours}h | 🗂️ **Thẻ yếu:** ${weakFlashcards.length}`,
+        inline: false,
+      })
       .setFooter({
         text: `💡 Kế hoạch được tối ưu bởi Study Buddy AI • Còn lại: ${limitCheck.remaining - 1}/3 lượt hôm nay`,
       })

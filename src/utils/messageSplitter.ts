@@ -20,7 +20,10 @@ export function splitMessage(text: string, maxLength: number = 2000): string[] {
   return chunks;
 }
 
-export function splitForEmbedAndFollowUp(text: string): { embedChunk: string; followUpChunks: string[] } {
+export function splitForEmbedAndFollowUp(text: string): {
+  embedChunk: string;
+  followUpChunks: string[];
+} {
   if (text.length <= 4000) {
     return { embedChunk: text, followUpChunks: [] };
   }
