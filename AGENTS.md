@@ -30,7 +30,7 @@ Dự án chuẩn hóa pnpm (`"packageManager": "pnpm@11.23.0"` trong package.jso
 ```bash
 pnpm add <pkg>        # không dùng: npm install <pkg>
 pnpm dev              # chạy bot
-pnpm test             # 33 test suites / 190 tests
+pnpm test             # 34 test suites / 203 tests
 pnpm exec tsc --noEmit
 pnpm run build
 pnpm lint             # ESLint 9 (type-checked) — bắt buộc pass

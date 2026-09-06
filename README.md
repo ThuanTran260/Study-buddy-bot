@@ -7,7 +7,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E.svg)](https://supabase.com/)
 [![Google Gemini](https://img.shields.io/badge/AI-Gemini_3.6_Flash-orange.svg)](https://aistudio.google.com/)
 [![Upstash Redis](https://img.shields.io/badge/Cache-Upstash_Redis-red.svg)](https://upstash.com/)
-[![Tests](https://img.shields.io/badge/Tests-190_Passed_100%25-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-203_Passed_100%25-success.svg)]()
 [![License MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **Study Buddy 3.0 (Master Edition)** is an enterprise-grade academic collaboration ecosystem for Discord. It seamlessly integrates **Generative AI (Google Gemini 3.6 Flash with Multi-Model Cascade)**, the **SuperMemo-2 (SM-2) Spaced Repetition Algorithm**, **Streak Gamification 🔥**, **Dynamic Pomodoro Voice Study Rooms**, a **Multi-Modal Visual Engine (Mermaid diagrams & AI illustrations)**, and **Multi-Tenant Guild Administration** — all backed by a **Zero-Idle-Cost background architecture** with **Upstash Redis hybrid caching** and **In-Memory resilience fallback**.
@@ -64,7 +64,7 @@ $$\text{Review Interval: } I(n) = \begin{cases} 1 & \text{for } n = 1 \\ 6 & \te
 4. **Timezone Resilience (`Asia/Ho_Chi_Minh`)**: Calendar dates standardized to `YYYY-MM-DD` via `Intl.DateTimeFormat` $\rightarrow$ Prevents late-night streak breakage.
 5. **Mention Exploit Protection**: Sanitizer strips `@everyone` and `@here`, complemented by API-level `allowedMentions: { parse: [] }`.
 6. **Multi-Tenancy Guild Isolation**: Dynamic guild-specific configurations isolated at the database query level.
-7. **Test-Driven Development (TDD)**: 33/33 Test Suites, 190/190 Unit Tests with 100% pass rate.
+7. **Test-Driven Development (TDD)**: 34/34 Test Suites, 203/203 Unit Tests with 100% pass rate.
 
 ---
 
@@ -127,7 +127,7 @@ pnpm run deploy:commands
 
 ### 5. Test Suite & Startup
 ```bash
-pnpm test        # Execute 190 unit tests across 33 test suites
+pnpm test        # Execute 203 unit tests across 34 test suites
 pnpm dev         # Launch bot in development mode with nodemon
 ```
 
@@ -158,6 +158,7 @@ PASS tests/services/dailyReminderService.test.ts
 PASS tests/services/conversationMemory.test.ts
 PASS tests/services/cleanupService.test.ts
 PASS tests/services/aiService.test.ts
+PASS tests/services/flashcardManageService.test.ts
 PASS tests/commands/studyPlan.test.ts
 PASS tests/commands/leaderboard.test.ts
 PASS tests/commands/group.test.ts
@@ -170,8 +171,8 @@ PASS tests/simulations/userJourneySimulator.test.ts
 PASS tests/simulations/flashcardAutocomplete.test.ts
 PASS tests/simulations/visualEdgeCases.test.ts
 
-Test Suites: 33 passed, 33 total
-Tests:       190 passed, 190 total
+Test Suites: 34 passed, 34 total
+Tests:       203 passed, 203 total
 Snapshots:   0 total
 Time:        40.378s
 ```
