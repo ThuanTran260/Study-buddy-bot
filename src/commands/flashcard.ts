@@ -11,12 +11,25 @@ import {
   ButtonInteraction,
   Collection,
   Snowflake,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { calculateSM2 } from '../services/sm2Service';
 import { generateFlashcardsJson, parseFlashcardAIResponse } from '../services/aiService';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
+import {
+  getUserDecks,
+  getDeckWithStats,
+  getDeckCards,
+  renameDeck,
+  resetSm2Progress,
+  deleteDeck,
+  updateCard,
+  deleteCard,
+} from '../services/flashcardManageService';
 import { resolveGuildId } from '../utils/guildResolver';
 import { logger } from '../utils/logger';
 
@@ -132,6 +145,19 @@ export const data = new SlashCommandBuilder()
           .setName('nguoi_nhan')
           .setDescription('Người bạn muốn chia sẻ bộ thẻ này')
           .setRequired(true)
+      )
+  )
+  .addSubcommand((sub) =>
+    sub
+      .setName('manage')
+      .setDescription('Quản lý bộ thẻ: xem, sửa, xóa thẻ và bộ thẻ')
+      .addStringOption((opt) =>
+        opt
+          .setName('ten_bo_the')
+          .setDescription('Tên bộ thẻ muốn quản lý (để trống để chọn từ danh sách)')
+          .setRequired(false)
+          .setMaxLength(100)
+          .setAutocomplete(true)
       )
   );
 
@@ -440,9 +466,736 @@ async function startReviewSession(
   }
 }
 
+export async function handleManage(interaction: ChatInputCommandInteraction): Promise<void> {
+  await interaction.deferReply({ ephemeral: true });
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { discordUserId: interaction.user.id },
+    });
+    if (!dbUser) {
+      await interaction.editReply({
+        content: '❌ Có lỗi xảy ra. Vui lòng thử lại sau.',
+        embeds: [],
+        components: [],
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
+    const userId = dbUser.id;
+
+    const rawName = interaction.options.getString('ten_bo_the');
+    const requestedName =
+      rawName !== null && rawName.trim().length > 0 ? rawName.trim() : null;
+
+    let currentDeckId: string | null = null;
+    let cards: Awaited<ReturnType<typeof getDeckCards>> = [];
+    let pageIndex = 0;
+
+    const renderDashboard = async (deckId: string): Promise<void> => {
+      const stats = await getDeckWithStats(deckId, userId);
+      if (!stats) {
+        await interaction.editReply({
+          content: '❌ Không tìm thấy bộ thẻ.',
+          embeds: [],
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      logger.info('Flashcard manage dashboard', {
+        userId,
+        deckId,
+        total: stats.total,
+        due: stats.due,
+      });
+      const embed = new EmbedBuilder()
+        .setTitle(`📁 ${stats.deck.name}`)
+        .setDescription(stats.deck.description ?? '*Không có mô tả*')
+        .setColor(0x5865f2)
+        .addFields(
+          { name: '📊 Tổng số thẻ', value: `${stats.total}`, inline: true },
+          { name: '⏰ Cần ôn', value: `${stats.due}`, inline: true }
+        )
+        .setTimestamp();
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`manage_browse_${deckId}`)
+          .setLabel('🔍 Xem thẻ')
+          .setStyle(ButtonStyle.Primary)
+          .setDisabled(stats.total === 0),
+        new ButtonBuilder()
+          .setCustomId(`manage_rename_${deckId}`)
+          .setLabel('✏️ Đổi tên')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`manage_reset_${deckId}`)
+          .setLabel('🔄 Reset SM-2')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`manage_deldeck_${deckId}`)
+          .setLabel('🗑️ Xóa bộ')
+          .setStyle(ButtonStyle.Danger)
+      );
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row],
+        allowedMentions: { parse: [] },
+      });
+    };
+
+    const renderDeckSelect = async (
+      decks: Array<{ id: string; name: string }>
+    ): Promise<void> => {
+      const options = decks.slice(0, 25).map((d) => ({
+        label: d.name.slice(0, 100) || 'Bộ thẻ',
+        value: d.id,
+      }));
+      const select = new StringSelectMenuBuilder()
+        .setCustomId('manage_select_deck')
+        .setPlaceholder('👉 Chọn bộ thẻ để quản lý...')
+        .addOptions(options);
+      const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select);
+      const embed = new EmbedBuilder()
+        .setTitle('📚 Quản lý bộ thẻ')
+        .setDescription('Chọn một bộ thẻ bên dưới để xem và quản lý.')
+        .setColor(0x5865f2);
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row],
+        allowedMentions: { parse: [] },
+      });
+    };
+
+    const renderCarousel = async (): Promise<void> => {
+      const deckId = currentDeckId;
+      if (!deckId) {
+        return;
+      }
+      const freshCards = await getDeckCards(deckId, userId);
+      cards = freshCards;
+      logger.info('Flashcard manage carousel', {
+        userId,
+        deckId,
+        count: cards.length,
+        pageIndex,
+      });
+      if (cards.length === 0) {
+        const stats = await getDeckWithStats(deckId, userId);
+        if (!stats) {
+          await interaction.editReply({
+            content: '❌ Không tìm thấy bộ thẻ.',
+            embeds: [],
+            components: [],
+            allowedMentions: { parse: [] },
+          });
+          return;
+        }
+        const emptyEmbed = new EmbedBuilder()
+          .setTitle(`📁 ${stats.deck.name}`)
+          .setDescription('Bộ thẻ này chưa có thẻ nào. Hãy thêm thẻ mới để bắt đầu học!')
+          .setColor(0x5865f2);
+        const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`manage_back_${deckId}`)
+            .setLabel('⬅️ Quay lại')
+            .setStyle(ButtonStyle.Secondary)
+        );
+        await interaction.editReply({
+          embeds: [emptyEmbed],
+          components: [backRow],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      if (pageIndex < 0) {
+        pageIndex = 0;
+      }
+      if (pageIndex >= cards.length) {
+        pageIndex = cards.length - 1;
+      }
+      const card = cards[pageIndex];
+      if (!card) {
+        await interaction.editReply({
+          content: '❌ Không tìm thấy thẻ (có thể vừa bị xóa).',
+          embeds: [],
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      const embed = new EmbedBuilder()
+        .setTitle(`🃏 Thẻ ${pageIndex + 1}/${cards.length}`)
+        .setDescription(`**Mặt trước:**\n${card.front}\n\n**Mặt sau:**\n${card.back}`)
+        .setColor(0x5865f2)
+        .setFooter({ text: `Dùng nút bên dưới để điều hướng và quản lý thẻ` });
+      const navRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`manage_prev_${deckId}`)
+          .setLabel('◀️ Trước')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(pageIndex === 0),
+        new ButtonBuilder()
+          .setCustomId(`manage_next_${deckId}`)
+          .setLabel('Sau ▶️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(pageIndex >= cards.length - 1),
+        new ButtonBuilder()
+          .setCustomId(`manage_back_${deckId}`)
+          .setLabel('⬅️ Quay lại')
+          .setStyle(ButtonStyle.Secondary)
+      );
+      const actionRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`manage_editcard_${card.id}`)
+          .setLabel('✏️ Sửa thẻ')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`manage_delcard_${card.id}`)
+          .setLabel('🗑️ Xóa thẻ')
+          .setStyle(ButtonStyle.Danger)
+      );
+      await interaction.editReply({
+        embeds: [embed],
+        components: [navRow, actionRow],
+        allowedMentions: { parse: [] },
+      });
+    };
+
+    const renderResetConfirm = async (deckId: string): Promise<void> => {
+      const stats = await getDeckWithStats(deckId, userId);
+      if (!stats) {
+        await interaction.editReply({
+          content: '❌ Không tìm thấy bộ thẻ.',
+          embeds: [],
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      const embed = new EmbedBuilder()
+        .setTitle('🔄 Xác nhận Reset SM-2')
+        .setDescription(
+          `Bạn có chắc chắn muốn reset tiến độ học (SM-2) của **${stats.total} thẻ** trong bộ **"${stats.deck.name}"** về trạng thái ban đầu?`
+        )
+        .setColor(0xfee75c);
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`manage_confirm_reset_${deckId}`)
+          .setLabel('✅ Xác nhận')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId(`manage_cancel_reset_${deckId}`)
+          .setLabel('❌ Hủy')
+          .setStyle(ButtonStyle.Secondary)
+      );
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row],
+        allowedMentions: { parse: [] },
+      });
+    };
+
+    const renderDeleteCardConfirm = async (cardId: string): Promise<void> => {
+      const embed = new EmbedBuilder()
+        .setTitle('🗑️ Xác nhận xóa thẻ')
+        .setDescription('Bạn có chắc chắn muốn xóa thẻ này? Hành động này không thể hoàn tác.')
+        .setColor(0xed4245);
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`manage_confirm_delcard_${cardId}`)
+          .setLabel('✅ Xác nhận xóa')
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId(`manage_cancel_delcard_${cardId}`)
+          .setLabel('❌ Hủy')
+          .setStyle(ButtonStyle.Secondary)
+      );
+      await interaction.editReply({
+        embeds: [embed],
+        components: [row],
+        allowedMentions: { parse: [] },
+      });
+    };
+
+    if (requestedName !== null) {
+      const decks = await getUserDecks(userId);
+      const exact = decks.find((d) => d.name === requestedName);
+      const fallback = decks.find(
+        (d) => d.name.toLowerCase() === requestedName.toLowerCase()
+      );
+      const matched = exact ?? fallback;
+      if (!matched) {
+        await interaction.editReply({
+          content: `❌ Không tìm thấy bộ thẻ **"${requestedName}"**.`,
+          embeds: [],
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      currentDeckId = matched.id;
+      await renderDashboard(currentDeckId);
+    } else {
+      const decks = await getUserDecks(userId);
+      if (decks.length === 0) {
+        await interaction.editReply({
+          content:
+            '📭 Bạn chưa có bộ thẻ nào! Hãy tạo bộ thẻ đầu tiên bằng lệnh `/flashcard deck-create`.',
+          embeds: [],
+          components: [],
+          allowedMentions: { parse: [] },
+        });
+        return;
+      }
+      await renderDeckSelect(decks);
+    }
+
+    const replyMsg = await interaction.fetchReply();
+    const collector = replyMsg.createMessageComponentCollector({
+      filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith('manage_'),
+      time: 300_000,
+    });
+
+    collector.on('collect', async (i) => {
+      try {
+        if (i.isStringSelectMenu()) {
+          if (i.customId === 'manage_select_deck') {
+            await i.deferUpdate();
+            const selectedId = i.values[0];
+            if (!selectedId) {
+              return;
+            }
+            currentDeckId = selectedId;
+            pageIndex = 0;
+            await renderDashboard(selectedId);
+          }
+          return;
+        }
+        if (!i.isButton()) {
+          return;
+        }
+        const customId = i.customId;
+
+        if (customId.startsWith('manage_confirm_reset_')) {
+          const deckId = customId.slice('manage_confirm_reset_'.length);
+          if (!deckId) {
+            return;
+          }
+          await i.deferUpdate();
+          const res = await resetSm2Progress(deckId, userId);
+          logger.info('Flashcard manage reset', { userId, deckId, count: res.count });
+          await interaction.followUp({
+            content: `✅ Đã reset ${res.count} thẻ về trạng thái ban đầu.`,
+            ephemeral: true,
+            allowedMentions: { parse: [] },
+          });
+          currentDeckId = deckId;
+          await renderDashboard(deckId);
+          return;
+        }
+
+        if (customId.startsWith('manage_cancel_reset_')) {
+          const deckId = customId.slice('manage_cancel_reset_'.length);
+          if (!deckId) {
+            return;
+          }
+          await i.deferUpdate();
+          currentDeckId = deckId;
+          await renderDashboard(deckId);
+          return;
+        }
+
+        if (customId.startsWith('manage_confirm_delcard_')) {
+          const cardId = customId.slice('manage_confirm_delcard_'.length);
+          if (!cardId) {
+            return;
+          }
+          await i.deferUpdate();
+          const deckId = currentDeckId;
+          if (!deckId) {
+            return;
+          }
+          const res = await deleteCard(cardId, deckId, userId);
+          logger.info('Flashcard manage delete card', { userId, deckId, cardId });
+          if (!res.success) {
+            await interaction.followUp({
+              content: '❌ Không tìm thấy thẻ (có thể vừa bị xóa).',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            await renderCarousel();
+            return;
+          }
+          await renderCarousel();
+          return;
+        }
+
+        if (customId.startsWith('manage_cancel_delcard_')) {
+          await i.deferUpdate();
+          await renderCarousel();
+          return;
+        }
+
+        if (customId.startsWith('manage_browse_')) {
+          const deckId = customId.slice('manage_browse_'.length);
+          if (!deckId) {
+            return;
+          }
+          await i.deferUpdate();
+          currentDeckId = deckId;
+          pageIndex = 0;
+          await renderCarousel();
+          return;
+        }
+
+        if (customId.startsWith('manage_rename_')) {
+          const deckId = customId.slice('manage_rename_'.length);
+          if (!deckId) {
+            return;
+          }
+          const stats = await getDeckWithStats(deckId, userId);
+          if (!stats) {
+            await i.deferUpdate();
+            await interaction.editReply({
+              content: '❌ Không tìm thấy bộ thẻ.',
+              embeds: [],
+              components: [],
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const modalId = `manage_modal_rename_${deckId}`;
+          const modal = new ModalBuilder().setCustomId(modalId).setTitle('✏️ Đổi tên bộ thẻ');
+          const nameInput = new TextInputBuilder()
+            .setCustomId('new_name')
+            .setLabel('Tên mới')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMinLength(1)
+            .setMaxLength(100)
+            .setValue(stats.deck.name.slice(0, 100));
+          const descValue = (stats.deck.description ?? '').slice(0, 200);
+          const descInput = new TextInputBuilder()
+            .setCustomId('new_desc')
+            .setLabel('Mô tả mới')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(200);
+          if (descValue.length > 0) {
+            descInput.setValue(descValue);
+          }
+          modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(nameInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(descInput)
+          );
+          await i.showModal(modal);
+          const modalInt = await i
+            .awaitModalSubmit({
+              filter: (m) => m.customId === modalId && m.user.id === interaction.user.id,
+              time: 120_000,
+            })
+            .catch(() => null);
+          if (!modalInt) {
+            await interaction.followUp({
+              content: '⏱️ Hết thời gian nhập (120 giây). Vui lòng thử lại.',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const newName = modalInt.fields.getTextInputValue('new_name');
+          const newDesc = modalInt.fields.getTextInputValue('new_desc');
+          const result = await renameDeck(deckId, userId, newName, newDesc);
+          logger.info('Flashcard manage rename', { userId, deckId });
+          if (!result.success) {
+            let msg = '❌ Không tìm thấy bộ thẻ.';
+            if (result.reason === 'NAME_EXISTS') {
+              msg = '❌ Tên này đã tồn tại, chọn tên khác.';
+            } else if (result.reason === 'EMPTY_NAME') {
+              msg = '❌ Tên không được để trống.';
+            }
+            await modalInt.reply({
+              content: msg,
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            currentDeckId = deckId;
+            await renderDashboard(deckId);
+            return;
+          }
+          await modalInt.reply({
+            content: `✅ Đã đổi tên bộ thẻ thành **"${result.deck.name}"**.`,
+            ephemeral: true,
+            allowedMentions: { parse: [] },
+          });
+          currentDeckId = deckId;
+          await renderDashboard(deckId);
+          return;
+        }
+
+        if (customId.startsWith('manage_reset_')) {
+          const deckId = customId.slice('manage_reset_'.length);
+          if (!deckId) {
+            return;
+          }
+          await i.deferUpdate();
+          currentDeckId = deckId;
+          await renderResetConfirm(deckId);
+          return;
+        }
+
+        if (customId.startsWith('manage_deldeck_')) {
+          const deckId = customId.slice('manage_deldeck_'.length);
+          if (!deckId) {
+            return;
+          }
+          const stats = await getDeckWithStats(deckId, userId);
+          if (!stats) {
+            await i.deferUpdate();
+            await interaction.editReply({
+              content: '❌ Không tìm thấy bộ thẻ.',
+              embeds: [],
+              components: [],
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const modalId = `manage_modal_deldeck_${deckId}`;
+          const modal = new ModalBuilder().setCustomId(modalId).setTitle('🗑️ Xóa bộ thẻ');
+          const confirmInput = new TextInputBuilder()
+            .setCustomId('confirm')
+            .setLabel('Xác nhận xóa')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(100)
+            .setPlaceholder("Gõ 'xác nhận' hoặc tên bộ thẻ");
+          modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput)
+          );
+          await i.showModal(modal);
+          const modalInt = await i
+            .awaitModalSubmit({
+              filter: (m) => m.customId === modalId && m.user.id === interaction.user.id,
+              time: 120_000,
+            })
+            .catch(() => null);
+          if (!modalInt) {
+            await interaction.followUp({
+              content: '⏱️ Hết thời gian nhập (120 giây). Vui lòng thử lại.',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const input = modalInt.fields.getTextInputValue('confirm');
+          const fresh = await getDeckWithStats(deckId, userId);
+          if (!fresh) {
+            await modalInt.reply({
+              content: '❌ Không tìm thấy bộ thẻ.',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const normalized = input.trim().toLowerCase();
+          const accepted = new Set<string>([
+            'xac nhan',
+            'xác nhận',
+            'delete',
+            fresh.deck.name.toLowerCase(),
+          ]);
+          if (!accepted.has(normalized)) {
+            await modalInt.reply({
+              content: "❌ Xác nhận không đúng. Vui lòng gõ 'xác nhận' hoặc tên bộ thẻ để xóa.",
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const delRes = await deleteDeck(deckId, userId);
+          logger.info('Flashcard manage delete deck', { userId, deckId });
+          if (!delRes.success) {
+            await modalInt.reply({
+              content: '❌ Không tìm thấy bộ thẻ.',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          await modalInt.reply({
+            content: `✅ Đã xóa bộ thẻ **"${fresh.deck.name}"**.`,
+            ephemeral: true,
+            allowedMentions: { parse: [] },
+          });
+          currentDeckId = null;
+          await interaction.editReply({
+            content: `✅ Đã xóa bộ thẻ **"${fresh.deck.name}"**.`,
+            embeds: [],
+            components: [],
+            allowedMentions: { parse: [] },
+          });
+          return;
+        }
+
+        if (customId.startsWith('manage_prev_')) {
+          await i.deferUpdate();
+          pageIndex = pageIndex - 1;
+          if (pageIndex < 0) {
+            pageIndex = 0;
+          }
+          await renderCarousel();
+          return;
+        }
+
+        if (customId.startsWith('manage_next_')) {
+          await i.deferUpdate();
+          pageIndex = pageIndex + 1;
+          await renderCarousel();
+          return;
+        }
+
+        if (
+          customId.startsWith('manage_back_') ||
+          customId === 'manage_back' ||
+          customId === 'manage_select_back'
+        ) {
+          await i.deferUpdate();
+          const deckId = currentDeckId;
+          if (!deckId) {
+            return;
+          }
+          await renderDashboard(deckId);
+          return;
+        }
+
+        if (customId.startsWith('manage_editcard_')) {
+          const cardId = customId.slice('manage_editcard_'.length);
+          if (!cardId) {
+            return;
+          }
+          const deckId = currentDeckId;
+          if (!deckId) {
+            await i.deferUpdate();
+            return;
+          }
+          let oldCard = cards.find((c) => c.id === cardId);
+          if (!oldCard) {
+            const refetched = await getDeckCards(deckId, userId);
+            cards = refetched;
+            oldCard = cards.find((c) => c.id === cardId);
+          }
+          if (!oldCard) {
+            await i.deferUpdate();
+            await interaction.followUp({
+              content: '❌ Không tìm thấy thẻ (có thể vừa bị xóa).',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            await renderCarousel();
+            return;
+          }
+          const modalId = `manage_modal_editcard_${cardId}`;
+          const modal = new ModalBuilder().setCustomId(modalId).setTitle('✏️ Sửa thẻ');
+          const frontInput = new TextInputBuilder()
+            .setCustomId('front')
+            .setLabel('Mặt trước')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMinLength(1)
+            .setMaxLength(1000)
+            .setValue(oldCard.front.slice(0, 1000));
+          const backInput = new TextInputBuilder()
+            .setCustomId('back')
+            .setLabel('Mặt sau')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMinLength(1)
+            .setMaxLength(1000)
+            .setValue(oldCard.back.slice(0, 1000));
+          modal.addComponents(
+            new ActionRowBuilder<TextInputBuilder>().addComponents(frontInput),
+            new ActionRowBuilder<TextInputBuilder>().addComponents(backInput)
+          );
+          await i.showModal(modal);
+          const modalInt = await i
+            .awaitModalSubmit({
+              filter: (m) => m.customId === modalId && m.user.id === interaction.user.id,
+              time: 120_000,
+            })
+            .catch(() => null);
+          if (!modalInt) {
+            await interaction.followUp({
+              content: '⏱️ Hết thời gian nhập (120 giây). Vui lòng thử lại.',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            return;
+          }
+          const front = modalInt.fields.getTextInputValue('front');
+          const back = modalInt.fields.getTextInputValue('back');
+          const res = await updateCard(cardId, deckId, userId, front, back);
+          logger.info('Flashcard manage update card', { userId, deckId, cardId });
+          if (!res.success) {
+            await modalInt.reply({
+              content: '❌ Không tìm thấy thẻ (có thể vừa bị xóa).',
+              ephemeral: true,
+              allowedMentions: { parse: [] },
+            });
+            await renderCarousel();
+            return;
+          }
+          await modalInt.reply({
+            content: '✅ Đã cập nhật thẻ.',
+            ephemeral: true,
+            allowedMentions: { parse: [] },
+          });
+          await renderCarousel();
+          return;
+        }
+
+        if (customId.startsWith('manage_delcard_')) {
+          const cardId = customId.slice('manage_delcard_'.length);
+          if (!cardId) {
+            return;
+          }
+          await i.deferUpdate();
+          await renderDeleteCardConfirm(cardId);
+          return;
+        }
+
+        await i.deferUpdate();
+      } catch (err) {
+        logger.error('Error in flashcard manage collector', {
+          userId,
+          error: String(err),
+        });
+      }
+    });
+
+    collector.on('end', async () => {
+      await interaction.editReply({ components: [] }).catch(() => {});
+    });
+  } catch (error) {
+    logger.error('Error in flashcard manage', { error: String(error) });
+    await interaction
+      .editReply({
+        content: '❌ Có lỗi xảy ra. Vui lòng thử lại sau.',
+        embeds: [],
+        components: [],
+        allowedMentions: { parse: [] },
+      })
+      .catch(() => {});
+  }
+}
+
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
   const subcommand = interaction.options.getSubcommand();
+
+  if (subcommand === 'manage') {
+    await handleManage(interaction);
+    return;
+  }
 
   // Đảm bảo User có trong CSDL
   const user = await prisma.user.upsert({
