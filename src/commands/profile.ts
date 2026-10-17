@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
@@ -19,6 +20,11 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const discordUserId = interaction.user.id;
   const reminderOption = interaction.options.getString('nhac_nho');
+
+  // ⏱️ Ack trước mọi I/O: Discord chỉ cho 3s, DB chậm sẽ gây Unknown interaction (10062)
+  // Chỉ đổi cấu hình nhắc nhở mới trả lời riêng tư (ephemeral); xem hồ sơ thì công khai
+  const isReminderMode = reminderOption !== null;
+  await interaction.deferReply({ ephemeral: isReminderMode });
 
   try {
     // Nếu người dùng chọn đổi cấu hình nhắc nhở
@@ -41,7 +47,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         ? '🔔 Đã **BẬT** tính năng nhắc nhở ôn tập Flashcard lúc 07:00 sáng hàng ngày.'
         : '🔕 Đã **TẮT** tính năng nhắc nhở ôn tập Flashcard hàng ngày.';
 
-      await interaction.reply({ content: `✅ ${statusMsg}`, ephemeral: true });
+      await interaction.editReply({
+        content: `✅ ${statusMsg}`,
+        allowedMentions: { parse: [] },
+      });
       return;
     }
 
@@ -59,11 +68,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     });
 
     if (!user) {
-      await interaction.reply({
-        content:
-          '📝 Bạn chưa có dữ liệu học tập nào. Hãy bắt đầu bằng các lệnh `/quiz`, `/pomodoro` hoặc `/flashcard`!',
-        ephemeral: true,
-      });
+      // Placeholder đang public: gỡ đi rồi gửi thông báo riêng tư
+      await sendEphemeralAfterDefer(
+        interaction,
+        '📝 Bạn chưa có dữ liệu học tập nào. Hãy bắt đầu bằng các lệnh `/quiz`, `/pomodoro` hoặc `/flashcard`!'
+      );
       return;
     }
 
@@ -147,12 +156,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: 'Study Buddy 3.0 • Giữ vững tinh thần học tập mỗi ngày!' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
   } catch (error) {
     logger.error('Error executing profile command', { discordUserId, error: String(error) });
-    await interaction.reply({
-      content: '❌ Có lỗi xảy ra khi tải hồ sơ học tập.',
-      ephemeral: true,
-    });
+    const errorContent = '❌ Có lỗi xảy ra khi tải hồ sơ học tập.';
+    if (isReminderMode) {
+      // Placeholder đã là ephemeral: sửa trực tiếp là đủ riêng tư
+      await interaction.editReply({ content: errorContent, allowedMentions: { parse: [] } });
+    } else {
+      await sendEphemeralAfterDefer(interaction, errorContent);
+    }
   }
 }
