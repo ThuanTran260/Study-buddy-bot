@@ -1,6 +1,7 @@
 import { execute } from '../../src/commands/tomtat';
 import { prisma } from '../../src/config/prisma';
 import * as dbRateLimiter from '../../src/services/dbRateLimiter';
+import * as aiService from '../../src/services/aiService';
 import { sendEphemeralAfterDefer } from '../../src/utils/interactionReply';
 
 jest.mock('../../src/config/prisma', () => ({
@@ -67,5 +68,35 @@ describe('📝 /tomtat Command — Discord 3s acknowledgement deadline', () => {
     expect(interaction.deferReply).toHaveBeenCalledTimes(1);
     expect(sendEphemeralAfterDefer).toHaveBeenCalledWith(interaction, '⏳ X');
     expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it('keeps the delivered answer when a follow-up chunk fails', async () => {
+    const longSummary = 'câu trả lời dài. '.repeat(400);
+    (aiService.summarizeText as jest.Mock).mockResolvedValueOnce(longSummary);
+    const interaction = makeInteraction();
+    interaction.followUp.mockRejectedValueOnce(new Error('followUp failed'));
+
+    await execute(interaction);
+
+    expect(interaction.editReply).toHaveBeenCalledTimes(1);
+    expect(interaction.followUp).toHaveBeenCalledTimes(2);
+    const calls = interaction.followUp.mock.calls;
+    expect(calls[calls.length - 1][0]).toEqual(
+      expect.objectContaining({
+        ephemeral: true,
+        content: expect.stringContaining('Không gửi được phần tiếp theo'),
+      })
+    );
+  });
+
+  it('still replaces the placeholder with the error when the AI call fails', async () => {
+    (aiService.summarizeText as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+    const interaction = makeInteraction();
+
+    await execute(interaction);
+
+    expect(interaction.editReply).toHaveBeenLastCalledWith(
+      expect.objectContaining({ content: expect.stringContaining('❌ Không thể tóm tắt văn bản') })
+    );
   });
 });

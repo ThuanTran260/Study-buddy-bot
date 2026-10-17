@@ -35,6 +35,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // Đánh dấu khi bản tóm tắt đã được editReply, để lỗi ở chunk tiếp theo không ghi đè nội dung đã gửi
+  let answerDelivered = false;
+
   try {
     const summary = await summarizeText(text);
     await recordDbAiUsage(user.id, 'AI_SUMMARIZE');
@@ -50,6 +53,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
 
+    answerDelivered = true;
     for (const chunk of followUpChunks) {
       await interaction.followUp({ content: chunk, allowedMentions: { parse: [] } });
     }
@@ -60,6 +64,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         ? '⏱️ AI mất quá nhiều thời gian phản hồi (> 25s). Vui lòng thử lại sau.'
         : '❌ Không thể tóm tắt văn bản lúc này. Vui lòng thử lại sau.';
     logger.error('Command /tomtat failed', { userId: interaction.user.id, error: String(error) });
-    await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
+    if (answerDelivered) {
+      // Bản tóm tắt đã hiển thị: chỉ báo lỗi riêng tư, không ghi đè embed
+      await interaction
+        .followUp({
+          content: '⚠️ Không gửi được phần tiếp theo của câu trả lời. Vui lòng thử lại.',
+          ephemeral: true,
+          allowedMentions: { parse: [] },
+        })
+        .catch(() => {});
+    } else {
+      await interaction.editReply({ content: msg, allowedMentions: { parse: [] } });
+    }
   }
 }
