@@ -65,6 +65,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const subcommand = interaction.options.getSubcommand();
 
+  // ⏱️ Ack ephemeral trước mọi I/O: Discord chỉ cho 3s, DB chậm sẽ gây Unknown interaction (10062)
+  await interaction.deferReply({ ephemeral: true });
+
   try {
     if (subcommand === 'set-study-room') {
       const channel = interaction.options.getChannel('channel', true);
@@ -79,9 +82,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         },
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `✅ Đã đặt kênh trigger tạo phòng học tự động thành: **${channel.name}** (<#${channel.id}>)`,
-        ephemeral: true,
       });
       return;
     }
@@ -99,9 +101,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         },
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `✅ Đã đặt kênh nhận log cảnh báo admin thành: **${channel.name}** (<#${channel.id}>)`,
-        ephemeral: true,
       });
       return;
     }
@@ -119,9 +120,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         },
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `✅ Đã cập nhật giới hạn phòng học tự động mở cùng lúc thành: **${maxRooms} phòng**`,
-        ephemeral: true,
       });
       return;
     }
@@ -150,11 +150,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .setFooter({ text: 'Dùng /config <subcommand> để thay đổi cấu hình' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true, allowedMentions: { parse: [] } });
+      await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
       return;
     }
   } catch (error) {
     logger.error('Error executing /config', { guildId, subcommand, error: String(error) });
-    await interaction.reply({ content: '❌ Có lỗi xảy ra khi lưu cấu hình.', ephemeral: true });
+    await interaction.editReply({ content: '❌ Có lỗi xảy ra khi lưu cấu hình.' });
   }
 }
