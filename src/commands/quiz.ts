@@ -13,6 +13,7 @@ import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('quiz')
@@ -25,19 +26,6 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const userRecord = await prisma.user.upsert({
-    where: { discordUserId: interaction.user.id },
-    create: { discordUserId: interaction.user.id, username: interaction.user.username },
-    update: { username: interaction.user.username },
-  });
-
-  // Kiểm tra DB Rate Limiter cho AI Quiz
-  const limitResult = await checkDbRateLimit(userRecord.id, 'AI_QUIZ');
-  if (!limitResult.allowed) {
-    await interaction.reply({ content: limitResult.message!, ephemeral: true });
-    return;
-  }
-
   const topic = interaction.options.getString('chu_de', true);
   const count = interaction.options.getInteger('so_cau') ?? 3;
 
@@ -49,7 +37,21 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // Defer ngay trước mọi thao tác DB/Redis để tránh Unknown interaction (10062)
   await interaction.deferReply();
+
+  const userRecord = await prisma.user.upsert({
+    where: { discordUserId: interaction.user.id },
+    create: { discordUserId: interaction.user.id, username: interaction.user.username },
+    update: { username: interaction.user.username },
+  });
+
+  // Kiểm tra DB Rate Limiter cho AI Quiz
+  const limitResult = await checkDbRateLimit(userRecord.id, 'AI_QUIZ');
+  if (!limitResult.allowed) {
+    await sendEphemeralAfterDefer(interaction, limitResult.message!);
+    return;
+  }
 
   try {
     const rawAiJson = await generateQuizJson(topic, count);
