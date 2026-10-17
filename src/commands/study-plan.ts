@@ -4,6 +4,7 @@ import { generateStudyPlanAI } from '../services/aiService';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { recordUserActivity } from '../services/streakService';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('study-plan')
@@ -24,6 +25,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const discordUserId = interaction.user.id;
   const userGoal = interaction.options.getString('muc_tieu')?.trim();
 
+  // Defer trước mọi I/O (DB/Redis) để không vượt hạn 3s của Discord (lỗi 10062)
+  await interaction.deferReply();
+
   const user = await prisma.user.upsert({
     where: { discordUserId },
     create: { discordUserId, username: interaction.user.username },
@@ -33,11 +37,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   // 1. Kiểm tra hạn mức Rate Limit (3 lần/ngày)
   const limitCheck = await checkDbRateLimit(user.id, 'AI_STUDY_PLAN');
   if (!limitCheck.allowed) {
-    await interaction.reply({ content: limitCheck.message!, ephemeral: true });
+    await sendEphemeralAfterDefer(interaction, limitCheck.message!);
     return;
   }
-
-  await interaction.deferReply();
 
   try {
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);

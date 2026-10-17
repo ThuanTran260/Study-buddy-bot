@@ -9,6 +9,7 @@ import { checkDbRateLimit } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
 import { resolveGuildId } from '../utils/guildResolver';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('tailieu')
@@ -93,6 +94,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const directText = interaction.options.getString('noi_dung');
   const fileAttachment = interaction.options.getAttachment('file');
 
+  // Defer trước mọi I/O (DB/Redis/fetch) để không vượt hạn 3s của Discord (lỗi 10062)
+  await interaction.deferReply();
+
   const user = await prisma.user.upsert({
     where: { discordUserId },
     create: { discordUserId, username: interaction.user.username },
@@ -102,11 +106,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   // 1. Kiểm tra hạn mức Rate Limit
   const limitCheck = await checkDbRateLimit(user.id, 'AI_DOCUMENT_STUDY');
   if (!limitCheck.allowed) {
-    await interaction.reply({ content: limitCheck.message!, ephemeral: true });
+    await sendEphemeralAfterDefer(interaction, limitCheck.message!);
     return;
   }
-
-  await interaction.deferReply();
 
   try {
     // 2. Trích xuất và thẩm định an toàn nội dung tài liệu

@@ -4,6 +4,7 @@ import { splitForEmbedAndFollowUp } from '../utils/messageSplitter';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('tomtat')
@@ -17,6 +18,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
+  const text = interaction.options.getString('noi_dung', true);
+
+  // Defer trước mọi I/O (DB/Redis) để không vượt hạn 3s của Discord (lỗi 10062)
+  await interaction.deferReply();
+
   const user = await prisma.user.upsert({
     where: { discordUserId: interaction.user.id },
     create: { discordUserId: interaction.user.id, username: interaction.user.username },
@@ -25,12 +31,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const limitResult = await checkDbRateLimit(user.id, 'AI_SUMMARIZE');
   if (!limitResult.allowed) {
-    await interaction.reply({ content: limitResult.message!, ephemeral: true });
+    await sendEphemeralAfterDefer(interaction, limitResult.message!);
     return;
   }
-
-  await interaction.deferReply();
-  const text = interaction.options.getString('noi_dung', true);
 
   try {
     const summary = await summarizeText(text);
