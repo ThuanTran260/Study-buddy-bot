@@ -32,6 +32,15 @@ import {
 } from '../services/flashcardManageService';
 import { resolveGuildId } from '../utils/guildResolver';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
+
+// Các subcommand trả lời riêng tư (ephemeral); ai-generate và list trả lời công khai.
+const EPHEMERAL_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  'deck-create',
+  'add',
+  'review',
+  'share',
+]);
 
 export const data = new SlashCommandBuilder()
   .setName('flashcard')
@@ -1197,6 +1206,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // ⚡ Defer NGAY trước mọi I/O (DB/Redis) để tránh DiscordAPIError[10062] Unknown interaction.
+  // Ephemerality khớp với các reply trước đây: deck-create/add/review/share riêng tư, ai-generate/list công khai.
+  await interaction.deferReply({ ephemeral: EPHEMERAL_SUBCOMMANDS.has(subcommand) });
+
   // Đảm bảo User có trong CSDL
   const user = await prisma.user.upsert({
     where: { discordUserId },
@@ -1215,9 +1228,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (existing) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `❌ Bạn đã có một bộ thẻ tên là **"${deckName}"** rồi.`,
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
@@ -1231,14 +1244,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         },
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `🎉 Đã tạo thành công bộ thẻ **"${deckName}"**! Dùng lệnh \`/flashcard add\` hoặc \`/flashcard ai-generate\` để thêm thẻ nhé.`,
-        ephemeral: true,
+        allowedMentions: { parse: [] },
       });
       return;
     } catch (error) {
       logger.error('Error in flashcard deck-create', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi tạo bộ thẻ.', ephemeral: true });
+      await interaction.editReply({
+        content: '❌ Có lỗi khi tạo bộ thẻ.',
+        allowedMentions: { parse: [] },
+      });
       return;
     }
   }
@@ -1255,9 +1271,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!deck) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `❌ Không tìm thấy bộ thẻ **"${deckName}"**. Bạn hãy tạo bộ thẻ trước bằng lệnh \`/flashcard deck-create\`.`,
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
@@ -1284,11 +1300,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         )
         .setFooter({ text: 'Thẻ đã sẵn sàng để ôn tập ngay hôm nay!' });
 
-      await interaction.reply({ embeds: [embed], ephemeral: true, allowedMentions: { parse: [] } });
+      await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
       return;
     } catch (error) {
       logger.error('Error in flashcard add', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi thêm thẻ flashcard.', ephemeral: true });
+      await interaction.editReply({
+        content: '❌ Có lỗi khi thêm thẻ flashcard.',
+        allowedMentions: { parse: [] },
+      });
       return;
     }
   }
@@ -1301,11 +1320,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const limitCheck = await checkDbRateLimit(user.id, 'AI_FLASHCARD');
     if (!limitCheck.allowed) {
-      await interaction.reply({ content: limitCheck.message!, ephemeral: true });
+      // Placeholder đang công khai -> xóa rồi gửi thông báo riêng tư
+      await sendEphemeralAfterDefer(interaction, limitCheck.message!);
       return;
     }
-
-    await interaction.deferReply();
 
     try {
       let deck = await prisma.flashcardDeck.findUnique({
@@ -1387,11 +1405,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (decks.length === 0) {
-        await interaction.reply({
-          content:
-            '📭 Bạn chưa có bộ thẻ nào! Hãy tạo bộ thẻ đầu tiên bằng lệnh `/flashcard deck-create` hoặc `/flashcard ai-generate`.',
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          '📭 Bạn chưa có bộ thẻ nào! Hãy tạo bộ thẻ đầu tiên bằng lệnh `/flashcard deck-create` hoặc `/flashcard ai-generate`.'
+        );
         return;
       }
 
@@ -1420,11 +1437,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .setFooter({ text: 'Dùng /flashcard review để ôn bài theo thuật toán SM-2' })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+      await interaction.editReply({ embeds: [embed], allowedMentions: { parse: [] } });
       return;
     } catch (error) {
       logger.error('Error in flashcard list', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi tải danh sách bộ thẻ.', ephemeral: true });
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi khi tải danh sách bộ thẻ.');
       return;
     }
   }
@@ -1453,10 +1470,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (decks.length === 0) {
-        await interaction.reply({
+        await interaction.editReply({
           content:
             '⚠️ Bạn chưa có bộ thẻ nào. Hãy dùng `/flashcard deck-create` hoặc `/flashcard ai-generate` để tạo bộ thẻ đầu tiên nhé!',
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
@@ -1468,9 +1485,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       );
 
       if (totalDue === 0) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `🎉 Tuyệt vời! Bạn đã hoàn thành toàn bộ các thẻ cần ôn hôm nay trên tất cả **${decks.length} bộ thẻ** (${totalCards} thẻ). Hãy quay lại vào ngày mai nhé!`,
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
@@ -1519,11 +1536,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .setColor(0x5865f2)
         .setFooter({ text: 'Menu tự động đóng sau 60 giây' });
 
-      const menuMsg = await interaction.reply({
+      // editReply trả về Message -> collector gắn vào đúng message này
+      const menuMsg = await interaction.editReply({
         embeds: [menuEmbed],
         components: [menuRow],
-        ephemeral: true,
-        fetchReply: true,
+        allowedMentions: { parse: [] },
       });
 
       const menuCollector = menuMsg.createMessageComponentCollector({
@@ -1554,9 +1571,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     } catch (error) {
       logger.error('Error in flashcard review menu', { userId: user.id, error: String(error) });
-      await interaction.reply({
+      await interaction.editReply({
         content: '❌ Có lỗi khi tải danh sách bộ thẻ ôn tập.',
-        ephemeral: true,
+        allowedMentions: { parse: [] },
       });
       return;
     }
@@ -1568,17 +1585,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const recipientUser = interaction.options.getUser('nguoi_nhan', true);
 
     if (recipientUser.bot) {
-      await interaction.reply({
+      await interaction.editReply({
         content: '❌ Bạn không thể chia sẻ bộ thẻ cho Bot.',
-        ephemeral: true,
+        allowedMentions: { parse: [] },
       });
       return;
     }
 
     if (recipientUser.id === interaction.user.id) {
-      await interaction.reply({
+      await interaction.editReply({
         content: '❌ Bạn không thể tự chia sẻ bộ thẻ cho chính mình.',
-        ephemeral: true,
+        allowedMentions: { parse: [] },
       });
       return;
     }
@@ -1590,17 +1607,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!sourceDeck) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `❌ Bạn không có bộ thẻ nào tên là **"${deckName}"**.`,
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
 
       if (sourceDeck.cards.length === 0) {
-        await interaction.reply({
+        await interaction.editReply({
           content: `⚠️ Bộ thẻ **"${deckName}"** hiện chưa có thẻ nhớ nào để chia sẻ. Hãy thêm thẻ trước nhé!`,
-          ephemeral: true,
+          allowedMentions: { parse: [] },
         });
         return;
       }
@@ -1630,11 +1647,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .setStyle(ButtonStyle.Secondary)
       );
 
-      const confirmMsg = await interaction.reply({
+      // editReply trả về Message -> collector gắn vào đúng message này
+      const confirmMsg = await interaction.editReply({
         embeds: [confirmEmbed],
         components: [confirmRow],
-        ephemeral: true,
-        fetchReply: true,
+        allowedMentions: { parse: [] },
       });
 
       const collector = confirmMsg.createMessageComponentCollector({
@@ -1710,7 +1727,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return;
     } catch (error) {
       logger.error('Error in flashcard share', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi xảy ra khi chia sẻ bộ thẻ.', ephemeral: true });
+      await interaction.editReply({
+        content: '❌ Có lỗi xảy ra khi chia sẻ bộ thẻ.',
+        allowedMentions: { parse: [] },
+      });
       return;
     }
   }
