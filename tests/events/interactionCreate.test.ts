@@ -1,5 +1,6 @@
 import { execute } from '../../src/events/interactionCreate';
 import { sendEphemeralAfterDefer } from '../../src/utils/interactionReply';
+import { prisma } from '../../src/config/prisma';
 import * as hoiCommand from '../../src/commands/hoi';
 
 // Heavy collaborators of interactionCreate are stubbed so the module loads without real I/O.
@@ -116,5 +117,61 @@ describe('interactionCreate global command error handler', () => {
     expect(sendEphemeralAfterDefer).toHaveBeenCalledTimes(1);
     expect(replied.followUp).toHaveBeenCalledTimes(1);
     expect(fresh.reply).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Invocation order of a jest mock; lower number means called earlier.
+// A never-called mock yields Infinity so an order check against it cannot pass vacuously.
+function order(mock: jest.Mock): number {
+  return mock.mock.invocationCallOrder[0] ?? Infinity;
+}
+
+function makeButtonInteraction(): any {
+  return {
+    customId: 'disable_daily_reminder',
+    user: { id: 'discord-123', username: 'tester' },
+    isButton: () => true,
+    isAutocomplete: () => false,
+    isChatInputCommand: () => false,
+    deferReply: jest.fn().mockResolvedValue(undefined),
+    editReply: jest.fn().mockResolvedValue(undefined),
+    reply: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+describe('interactionCreate disable_daily_reminder button', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('reminder button defers ephemerally before the upsert', async () => {
+    const interaction = makeButtonInteraction();
+
+    await execute(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledTimes(1);
+    expect(interaction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
+    expect(prisma.user.upsert).toHaveBeenCalledTimes(1);
+    expect(order(interaction.deferReply)).toBeLessThan(order(prisma.user.upsert as jest.Mock));
+    expect(interaction.editReply).toHaveBeenCalledTimes(1);
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringContaining('Đã tắt tính năng nhắc nhở') })
+    );
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  it('reminder button failure is reported via editReply', async () => {
+    (prisma.user.upsert as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+    const interaction = makeButtonInteraction();
+
+    await execute(interaction);
+
+    expect(interaction.deferReply).toHaveBeenCalledTimes(1);
+    expect(prisma.user.upsert).toHaveBeenCalledTimes(1);
+    expect(interaction.editReply).toHaveBeenCalledTimes(1);
+    expect(interaction.editReply).toHaveBeenCalledWith({
+      content: '❌ Có lỗi khi cập nhật cài đặt nhắc nhở.',
+    });
+    expect(interaction.reply).not.toHaveBeenCalled();
   });
 });

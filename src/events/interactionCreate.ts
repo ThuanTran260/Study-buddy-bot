@@ -56,6 +56,9 @@ export async function execute(interaction: Interaction): Promise<void> {
   if (interaction.isButton()) {
     if (interaction.customId === 'disable_daily_reminder') {
       try {
+        // 🛡️ Ack ngay (riêng tư) trước khi chạm DB để tránh Unknown interaction (10062)
+        await interaction.deferReply({ ephemeral: true });
+
         await prisma.user.upsert({
           where: { discordUserId: interaction.user.id },
           create: {
@@ -66,17 +69,15 @@ export async function execute(interaction: Interaction): Promise<void> {
           update: { dailyReminderEnabled: false },
         });
 
-        await interaction.reply({
+        await interaction.editReply({
           content:
             '🔕 Đã tắt tính năng nhắc nhở ôn tập hàng ngày. Bạn có thể bật lại bất cứ lúc nào bằng lệnh `/profile reminder:on`.',
-          ephemeral: true,
         });
       } catch (err) {
         logger.error('Error disabling daily reminder via button', { error: String(err) });
         await interaction
-          .reply({
+          .editReply({
             content: '❌ Có lỗi khi cập nhật cài đặt nhắc nhở.',
-            ephemeral: true,
           })
           .catch(() => {});
       }
