@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from '
 import { prisma } from '../config/prisma';
 import { sanitizeUnicodeInput } from '../utils/sanitize';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('group')
@@ -65,6 +66,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const discordUserId = interaction.user.id;
   const subcommand = interaction.options.getSubcommand();
 
+  // Defer ngay trước mọi I/O (DB) để tránh Unknown interaction (10062) khi vượt 3s.
+  // `leave` trả lời riêng tư; các lệnh còn lại public, thông báo lỗi/validation gửi riêng qua sendEphemeralAfterDefer.
+  await interaction.deferReply({ ephemeral: subcommand === 'leave' });
+
   // Đảm bảo User có trong CSDL
   const user = await prisma.user.upsert({
     where: { discordUserId },
@@ -85,10 +90,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const groupName = sanitizeUnicodeInput(rawGroupName);
 
     if (!groupName || groupName.length < 2) {
-      await interaction.reply({
-        content: '❌ Tên nhóm không hợp lệ hoặc quá ngắn. Vui lòng nhập lại tên nhóm.',
-        ephemeral: true,
-      });
+      await sendEphemeralAfterDefer(
+        interaction,
+        '❌ Tên nhóm không hợp lệ hoặc quá ngắn. Vui lòng nhập lại tên nhóm.'
+      );
       return;
     }
 
@@ -103,10 +108,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (existingMembership) {
-        await interaction.reply({
-          content: `❌ Bạn hiện đã là thành viên của nhóm **"${existingMembership.group.name}"**. Mỗi người chỉ được tham gia 1 nhóm trong server.`,
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          `❌ Bạn hiện đã là thành viên của nhóm **"${existingMembership.group.name}"**. Mỗi người chỉ được tham gia 1 nhóm trong server.`
+        );
         return;
       }
 
@@ -121,10 +126,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (existingName) {
-        await interaction.reply({
-          content: `❌ Nhóm **"${groupName}"** đã tồn tại trong server. Vui lòng chọn một tên khác!`,
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          `❌ Nhóm **"${groupName}"** đã tồn tại trong server. Vui lòng chọn một tên khác!`
+        );
         return;
       }
 
@@ -160,11 +165,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .setColor(0x57f287)
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
       return;
     } catch (error) {
       logger.error('Error in /group create', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi tạo nhóm học tập.', ephemeral: true });
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi khi tạo nhóm học tập.');
       return;
     }
   }
@@ -174,15 +179,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const targetDiscordUser = interaction.options.getUser('nguoi_dung', true);
 
     if (targetDiscordUser.bot) {
-      await interaction.reply({
-        content: '❌ Bạn không thể mời Bot vào nhóm học tập.',
-        ephemeral: true,
-      });
+      await sendEphemeralAfterDefer(interaction, '❌ Bạn không thể mời Bot vào nhóm học tập.');
       return;
     }
 
     if (targetDiscordUser.id === interaction.user.id) {
-      await interaction.reply({ content: '❌ Bạn đã ở trong nhóm rồi.', ephemeral: true });
+      await sendEphemeralAfterDefer(interaction, '❌ Bạn đã ở trong nhóm rồi.');
       return;
     }
 
@@ -199,18 +201,18 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!ownedGroup) {
-        await interaction.reply({
-          content: '❌ Bạn không phải là Trưởng nhóm của nhóm học tập nào trong Server này.',
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          '❌ Bạn không phải là Trưởng nhóm của nhóm học tập nào trong Server này.'
+        );
         return;
       }
 
       if (ownedGroup.members.length >= ownedGroup.maxMembers) {
-        await interaction.reply({
-          content: `⚠️ Nhóm **"${ownedGroup.name}"** đã đạt số lượng tối đa (${ownedGroup.maxMembers} thành viên).`,
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          `⚠️ Nhóm **"${ownedGroup.name}"** đã đạt số lượng tối đa (${ownedGroup.maxMembers} thành viên).`
+        );
         return;
       }
 
@@ -230,10 +232,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (targetExisting) {
-        await interaction.reply({
-          content: `❌ <@${targetDiscordUser.id}> hiện đã tham gia nhóm **"${targetExisting.group.name}"**.`,
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          `❌ <@${targetDiscordUser.id}> hiện đã tham gia nhóm **"${targetExisting.group.name}"**.`
+        );
         return;
       }
 
@@ -252,11 +254,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         )
         .setColor(0x5865f2);
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
       return;
     } catch (error) {
       logger.error('Error in /group invite', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi xảy ra khi mời thành viên.', ephemeral: true });
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi xảy ra khi mời thành viên.');
       return;
     }
   }
@@ -277,9 +279,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!membership) {
-        await interaction.reply({
+        await interaction.editReply({
           content: '❌ Bạn hiện không tham gia nhóm học tập nào trong Server này.',
-          ephemeral: true,
         });
         return;
       }
@@ -302,35 +303,31 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
               }),
             ]);
 
-            await interaction.reply({
+            await interaction.editReply({
               content: `👋 Bạn đã rời nhóm **"${group.name}"**. Quyền Trưởng nhóm đã được tự động chuyển giao cho thành viên kỳ cựu tiếp theo!`,
-              ephemeral: true,
             });
           } else {
-            await interaction.reply({
+            await interaction.editReply({
               content: '❌ Không tìm thấy thành viên kế nhiệm để chuyển giao quyền trưởng nhóm.',
-              ephemeral: true,
             });
           }
         } else {
           // Nhóm không còn ai -> Xóa nhóm
           await prisma.studyGroup.delete({ where: { id: group.id } });
-          await interaction.reply({
+          await interaction.editReply({
             content: `👋 Bạn đã rời nhóm. Do không còn thành viên nào, nhóm **"${group.name}"** đã được giải tán.`,
-            ephemeral: true,
           });
         }
       } else {
         await prisma.studyGroupMember.delete({ where: { id: membership.id } });
-        await interaction.reply({
+        await interaction.editReply({
           content: `👋 Bạn đã rời khỏi nhóm **"${group.name}"** thành công.`,
-          ephemeral: true,
         });
       }
       return;
     } catch (error) {
       logger.error('Error in /group leave', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi rời nhóm.', ephemeral: true });
+      await interaction.editReply({ content: '❌ Có lỗi khi rời nhóm.' });
       return;
     }
   }
@@ -340,10 +337,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const targetDiscordUser = interaction.options.getUser('nguoi_dung', true);
 
     if (targetDiscordUser.id === interaction.user.id) {
-      await interaction.reply({
-        content: '❌ Bạn không thể tự kick chính mình. Dùng `/group leave` nếu muốn rời nhóm.',
-        ephemeral: true,
-      });
+      await sendEphemeralAfterDefer(
+        interaction,
+        '❌ Bạn không thể tự kick chính mình. Dùng `/group leave` nếu muốn rời nhóm.'
+      );
       return;
     }
 
@@ -356,10 +353,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!ownedGroup) {
-        await interaction.reply({
-          content: '❌ Bạn không có quyền kick vì bạn không phải là Trưởng nhóm.',
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          '❌ Bạn không có quyền kick vì bạn không phải là Trưởng nhóm.'
+        );
         return;
       }
 
@@ -371,10 +368,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (!targetMember) {
-        await interaction.reply({
-          content: `❌ <@${targetDiscordUser.id}> không nằm trong nhóm **"${ownedGroup.name}"** của bạn.`,
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          `❌ <@${targetDiscordUser.id}> không nằm trong nhóm **"${ownedGroup.name}"** của bạn.`
+        );
         return;
       }
 
@@ -382,24 +379,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         where: { id: targetMember.id },
       });
 
-      await interaction.reply({
+      await interaction.editReply({
         content: `👢 Đã mời <@${targetDiscordUser.id}> ra khỏi nhóm **"${ownedGroup.name}"**.`,
       });
       return;
     } catch (error) {
       logger.error('Error in /group kick', { userId: user.id, error: String(error) });
-      await interaction.reply({
-        content: '❌ Có lỗi xảy ra khi kick thành viên.',
-        ephemeral: true,
-      });
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi xảy ra khi kick thành viên.');
       return;
     }
   }
 
   // 5. XEM THỐNG KÊ NHÓM & MVP
   if (subcommand === 'stats') {
-    await interaction.deferReply();
-
     try {
       const membership = await prisma.studyGroupMember.findFirst({
         where: {
@@ -516,11 +508,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       });
 
       if (groups.length === 0) {
-        await interaction.reply({
-          content:
-            '📭 Hiện chưa có nhóm học tập nào trong Server này. Hãy dùng `/group create` để tạo nhóm đầu tiên!',
-          ephemeral: true,
-        });
+        await sendEphemeralAfterDefer(
+          interaction,
+          '📭 Hiện chưa có nhóm học tập nào trong Server này. Hãy dùng `/group create` để tạo nhóm đầu tiên!'
+        );
         return;
       }
 
@@ -537,11 +528,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .addFields(groupFields)
         .setFooter({ text: 'Dùng /group stats để xem thành tích chi tiết nhóm của bạn' });
 
-      await interaction.reply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
       return;
     } catch (error) {
       logger.error('Error in /group list', { userId: user.id, error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi tải danh sách nhóm.', ephemeral: true });
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi khi tải danh sách nhóm.');
       return;
     }
   }
