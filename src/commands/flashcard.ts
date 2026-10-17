@@ -493,8 +493,7 @@ export async function handleManage(interaction: ChatInputCommandInteraction): Pr
     const userId = dbUser.id;
 
     const rawName = interaction.options.getString('ten_bo_the');
-    const requestedName =
-      rawName !== null && rawName.trim().length > 0 ? rawName.trim() : null;
+    const requestedName = rawName !== null && rawName.trim().length > 0 ? rawName.trim() : null;
 
     let currentDeckId: string | null = null;
     let cards: Awaited<ReturnType<typeof getDeckCards>> = [];
@@ -552,9 +551,7 @@ export async function handleManage(interaction: ChatInputCommandInteraction): Pr
       });
     };
 
-    const renderDeckSelect = async (
-      decks: Array<{ id: string; name: string }>
-    ): Promise<void> => {
+    const renderDeckSelect = async (decks: Array<{ id: string; name: string }>): Promise<void> => {
       const options = decks.slice(0, 25).map((d) => ({
         label: d.name.slice(0, 100) || 'Bộ thẻ',
         value: d.id,
@@ -729,9 +726,7 @@ export async function handleManage(interaction: ChatInputCommandInteraction): Pr
     if (requestedName !== null) {
       const decks = await getUserDecks(userId);
       const exact = decks.find((d) => d.name === requestedName);
-      const fallback = decks.find(
-        (d) => d.name.toLowerCase() === requestedName.toLowerCase()
-      );
+      const fallback = decks.find((d) => d.name.toLowerCase() === requestedName.toLowerCase());
       const matched = exact ?? fallback;
       if (!matched) {
         await interaction.editReply({
@@ -978,9 +973,7 @@ export async function handleManage(interaction: ChatInputCommandInteraction): Pr
             .setRequired(true)
             .setMaxLength(100)
             .setPlaceholder("Gõ 'xác nhận' hoặc tên bộ thẻ");
-          modal.addComponents(
-            new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput)
-          );
+          modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(confirmInput));
           await i.showModal(modal);
           const modalInt = await i
             .awaitModalSubmit({
