@@ -15,6 +15,7 @@ import {
 import { recordUserActivity } from '../services/streakService';
 import { prisma } from '../config/prisma';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 
 export const data = new SlashCommandBuilder()
   .setName('pomodoro')
@@ -57,6 +58,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const subcommand = interaction.options.getSubcommand();
 
   if (subcommand === 'stop') {
+    // Defer công khai trước mọi I/O Redis/DB để tránh lỗi 10062 (Unknown interaction)
+    await interaction.deferReply();
+
     try {
       const timer = activeTimers.get(voiceChannel.id);
       if (timer) {
@@ -70,14 +74,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       // Xóa sạch ghi chú trạng thái kênh voice (non-blocking)
       safeSetVoiceStatus(voiceChannel, '').catch(() => {});
 
-      await interaction.reply({
+      await interaction.editReply({
         content: '⏹️ Đã dừng phiên Pomodoro và xóa trạng thái kênh.',
-        ephemeral: false,
       });
       return;
     } catch (error) {
       logger.error('Error in pomodoro stop', { error: String(error) });
-      await interaction.reply({ content: '❌ Có lỗi khi dừng phiên Pomodoro.', ephemeral: true });
+      // Lỗi chỉ hiển thị riêng cho người dùng (ephemeral follow-up sau khi defer)
+      await sendEphemeralAfterDefer(interaction, '❌ Có lỗi khi dừng phiên Pomodoro.');
       return;
     }
   }
