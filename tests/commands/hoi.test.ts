@@ -50,6 +50,7 @@ function makeInteraction(isNew: boolean): any {
     deferReply: jest.fn().mockResolvedValue(undefined),
     reply: jest.fn().mockResolvedValue(undefined),
     editReply: jest.fn().mockResolvedValue(undefined),
+    deleteReply: jest.fn().mockResolvedValue(undefined),
     followUp: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -72,7 +73,7 @@ describe('💡 /hoi Command — Discord 3s acknowledgement deadline', () => {
     expect(deferAt).toBeLessThan(order(dbRateLimiter.checkDbRateLimit));
   });
 
-  it('reports rate-limit rejection via editReply after deferring (no second reply)', async () => {
+  it('reports rate-limit rejection privately after deferring', async () => {
     (dbRateLimiter.checkDbRateLimit as jest.Mock).mockResolvedValueOnce({
       allowed: false,
       remaining: 0,
@@ -84,8 +85,8 @@ describe('💡 /hoi Command — Discord 3s acknowledgement deadline', () => {
 
     expect(interaction.deferReply).toHaveBeenCalledTimes(1);
     expect(interaction.reply).not.toHaveBeenCalled();
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      expect.objectContaining({ content: '⏳ Hết hạn mức' })
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '⏳ Hết hạn mức', ephemeral: true })
     );
   });
 });

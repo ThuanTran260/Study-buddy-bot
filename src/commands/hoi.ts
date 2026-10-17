@@ -17,6 +17,7 @@ import {
   getConversationMessageCount,
 } from '../services/conversationMemory';
 import { splitForEmbedAndFollowUp } from '../utils/messageSplitter';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 import { env } from '../config/env';
 import { checkDbRateLimit, recordDbAiUsage } from '../services/dbRateLimiter';
 import { prisma } from '../config/prisma';
@@ -59,7 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const limitResult = await checkDbRateLimit(user.id, 'AI_QUESTION');
   if (!limitResult.allowed) {
-    await interaction.editReply({ content: limitResult.message!, allowedMentions: { parse: [] } });
+    await sendEphemeralAfterDefer(interaction, limitResult.message!);
     return;
   }
 
