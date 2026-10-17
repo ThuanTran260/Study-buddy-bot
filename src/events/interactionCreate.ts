@@ -9,6 +9,7 @@ import {
 import { prisma } from '../config/prisma';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
+import { sendEphemeralAfterDefer } from '../utils/interactionReply';
 import { redisClient } from '../config/redis';
 import { checkDbRateLimit } from '../services/dbRateLimiter';
 import { extractMermaidCode, renderMermaidToBuffer } from '../services/visualService';
@@ -256,8 +257,12 @@ export async function execute(interaction: Interaction): Promise<void> {
     });
 
     const errorMsg = '❌ Có lỗi khi thực thi lệnh này.';
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ content: errorMsg }).catch(() => {});
+    if (interaction.replied) {
+      // 🛡️ Câu trả lời đã được gửi: không ghi đè, báo lỗi riêng tư bằng followUp
+      await interaction.followUp({ content: errorMsg, ephemeral: true }).catch(() => {});
+    } else if (interaction.deferred) {
+      // 🛡️ Placeholder "thinking…" công khai: xóa đi rồi báo lỗi riêng tư
+      await sendEphemeralAfterDefer(interaction, errorMsg).catch(() => {});
     } else {
       await interaction.reply({ content: errorMsg, ephemeral: true }).catch(() => {});
     }
