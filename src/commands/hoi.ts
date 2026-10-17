@@ -44,6 +44,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const userQuestion = interaction.options.getString('cau_hoi', true);
   const isNew = interaction.options.getBoolean('moi') ?? false;
 
+  // ⏱️ Ack trước mọi I/O: Discord chỉ cho 3s, DB/Redis chậm sẽ gây Unknown interaction (10062)
+  await interaction.deferReply();
+
   const user = await prisma.user.upsert({
     where: { discordUserId },
     create: { discordUserId, username: interaction.user.username },
@@ -56,11 +59,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   const limitResult = await checkDbRateLimit(user.id, 'AI_QUESTION');
   if (!limitResult.allowed) {
-    await interaction.reply({ content: limitResult.message!, ephemeral: true });
+    await interaction.editReply({ content: limitResult.message!, allowedMentions: { parse: [] } });
     return;
   }
-
-  await interaction.deferReply();
 
   try {
     const history = await getConversationHistory(discordUserId);
