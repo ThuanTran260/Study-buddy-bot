@@ -49,7 +49,11 @@ describe('Discord startup diagnostics', () => {
       route: '/gateway/bot',
       options: { headers: { authorization: 'private-token' } },
     };
-    client.rest.emit(RESTEvents.Response, request as never, { status: 429 } as never);
+    client.rest.emit(
+      RESTEvents.Response,
+      request as never,
+      { status: 429, headers: new Headers() } as never
+    );
     client.rest.emit(RESTEvents.RateLimited, {
       route: '/gateway/bot',
       global: true,
@@ -76,6 +80,48 @@ describe('Discord startup diagnostics', () => {
     ]);
     expect(output).not.toContain('private-token');
     expect(output).not.toContain('secret');
+  });
+
+  it.each<{ headers: Record<string, string>; expected: Record<string, unknown> }>([
+    {
+      headers: {
+        'retry-after': '120',
+        'x-ratelimit-reset-after': '119.5',
+        'x-ratelimit-scope': 'global',
+        'x-ratelimit-global': 'true',
+        'content-type': 'application/json; charset=utf-8',
+      },
+      expected: {
+        retryAfterSeconds: 120,
+        resetAfterSeconds: 119.5,
+        scope: 'global',
+        global: true,
+        contentType: 'application/json',
+      },
+    },
+    {
+      headers: { 'retry-after': 'private-token', 'x-ratelimit-scope': 'private-token' },
+      expected: {
+        retryAfterSeconds: null,
+        resetAfterSeconds: null,
+        scope: 'unknown',
+        global: false,
+        contentType: 'unknown',
+      },
+    },
+  ])('records safe 429 header metadata: $expected.scope', ({ headers, expected }) => {
+    stop = monitorDiscordStartup(client);
+    client.rest.emit(
+      RESTEvents.Response,
+      { route: '/gateway/bot' } as never,
+      {
+        status: 429,
+        headers: new Headers(headers),
+      } as never
+    );
+
+    expect(logger.warn).toHaveBeenCalledWith('[Discord] Gateway rate limit headers', expected);
+    expect(JSON.stringify((logger.warn as jest.Mock).mock.calls)).not.toContain('private-token');
   });
 
   it('runs one native probe after a stalled SDK request and reports only its safe result', async () => {

@@ -18,6 +18,26 @@ export function monitorDiscordStartup(client: Client): () => void {
     if (request.route !== '/gateway/bot') return;
     gatewayResponseReceived = true;
     logger.info('[Discord] Gateway HTTP response', { status: response.status });
+    if (response.status === 429) {
+      const readSeconds = (name: string): number | null => {
+        const raw = response.headers.get(name);
+        if (raw === null || raw.trim() === '') return null;
+        const value = Number(raw);
+        return Number.isFinite(value) && value >= 0 ? value : null;
+      };
+      const scope = response.headers.get('x-ratelimit-scope');
+      const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
+      logger.warn('[Discord] Gateway rate limit headers', {
+        retryAfterSeconds: readSeconds('retry-after'),
+        resetAfterSeconds: readSeconds('x-ratelimit-reset-after'),
+        scope: scope === 'user' || scope === 'global' || scope === 'shared' ? scope : 'unknown',
+        global: response.headers.get('x-ratelimit-global') === 'true',
+        contentType:
+          contentType === 'application/json' || contentType === 'text/html'
+            ? contentType
+            : 'unknown',
+      });
+    }
   };
   const onRateLimit = (data: RateLimitData): void => {
     if (data.route !== '/gateway/bot') return;
