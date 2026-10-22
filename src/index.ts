@@ -41,6 +41,9 @@ export const client = new Client({
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info('Study Buddy Bot is ready', {
     tag: readyClient.user.tag,
+    botUserId: readyClient.user.id,
+    configuredClientId: env.clientId,
+    clientIdMatches: readyClient.user.id === env.clientId,
     guilds: readyClient.guilds.cache.size,
   });
 
@@ -150,6 +153,22 @@ client.once(Events.ClientReady, async (readyClient) => {
     },
     { timezone: 'Asia/Ho_Chi_Minh' }
   );
+});
+
+client.on(Events.Error, (error) => {
+  logger.error('[Discord] Client error', { error: String(error) });
+});
+
+client.on(Events.ShardError, (error, shardId) => {
+  logger.error('[Discord] Gateway connection error', { shardId, error: String(error) });
+});
+
+client.on(Events.ShardDisconnect, (event, shardId) => {
+  logger.warn('[Discord] Gateway disconnected', { shardId, code: event.code });
+});
+
+client.on(Events.ShardResume, (shardId, replayedEvents) => {
+  logger.info('[Discord] Gateway resumed', { shardId, replayedEvents });
 });
 
 client.on(Events.InteractionCreate, (interaction) => {

@@ -2,6 +2,7 @@ import { execute } from '../../src/events/interactionCreate';
 import { sendEphemeralAfterDefer } from '../../src/utils/interactionReply';
 import { prisma } from '../../src/config/prisma';
 import * as hoiCommand from '../../src/commands/hoi';
+import { logger } from '../../src/utils/logger';
 
 // Heavy collaborators of interactionCreate are stubbed so the module loads without real I/O.
 jest.mock('../../src/config/prisma', () => ({ prisma: { user: { upsert: jest.fn() } } }));
@@ -41,6 +42,10 @@ const ERROR_MSG = '❌ Có lỗi khi thực thi lệnh này.';
 
 function makeInteraction(state: { deferred: boolean; replied: boolean }): any {
   return {
+    id: 'interaction-123',
+    applicationId: 'application-123',
+    guildId: 'guild-123',
+    createdTimestamp: Date.now(),
     commandName: 'hoi',
     user: { id: 'discord-123' },
     deferred: state.deferred,
@@ -117,6 +122,82 @@ describe('interactionCreate global command error handler', () => {
     expect(sendEphemeralAfterDefer).toHaveBeenCalledTimes(1);
     expect(replied.followUp).toHaveBeenCalledTimes(1);
     expect(fresh.reply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('interactionCreate command diagnostics', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('records receipt before waiting on a command and excludes token and input content', async () => {
+    let finish!: () => void;
+    (hoiCommand.execute as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const interaction = makeInteraction({ deferred: false, replied: false });
+    interaction.token = 'private-interaction-token';
+    interaction.options = { privateQuestion: 'private-question-content' };
+
+    const pending = execute(interaction);
+    const receipt = (logger.info as jest.Mock).mock.calls.find(
+      ([message]) => message === '[Discord] Slash command received'
+    );
+    // Always release the handler, including when the receipt assertion fails.
+    finish();
+    await pending;
+
+    expect(receipt?.[1]).toEqual(
+      expect.objectContaining({
+        interactionId: 'interaction-123',
+        applicationId: 'application-123',
+        command: 'hoi',
+        guildId: 'guild-123',
+      })
+    );
+    const output = JSON.stringify((logger.info as jest.Mock).mock.calls);
+    expect(output).not.toContain('private-interaction-token');
+    expect(output).not.toContain('private-question-content');
+  });
+
+  it('records successful acknowledgement after the command finishes', async () => {
+    const interaction = makeInteraction({ deferred: false, replied: false });
+    (hoiCommand.execute as jest.Mock).mockImplementationOnce(async () => {
+      interaction.replied = true;
+    });
+
+    await execute(interaction);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      '[Discord] Slash command completed',
+      expect.objectContaining({
+        interactionId: 'interaction-123',
+        replied: true,
+        deferred: false,
+        durationMs: expect.any(Number),
+      })
+    );
+  });
+
+  it('correlates callback errors with the interaction and acknowledgement state', async () => {
+    (hoiCommand.execute as jest.Mock).mockRejectedValueOnce(new Error('Unknown interaction'));
+    const interaction = makeInteraction({ deferred: false, replied: false });
+
+    await execute(interaction);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error executing command',
+      expect.objectContaining({
+        interactionId: 'interaction-123',
+        applicationId: 'application-123',
+        replied: false,
+        deferred: false,
+        durationMs: expect.any(Number),
+      })
+    );
   });
 });
 

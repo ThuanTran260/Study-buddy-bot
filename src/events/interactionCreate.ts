@@ -245,27 +245,57 @@ export async function execute(interaction: Interaction): Promise<void> {
 
   if (!interaction.isChatInputCommand()) return;
 
+  const startedAt = Date.now();
+  const commandContext = {
+    interactionId: interaction.id,
+    applicationId: interaction.applicationId,
+    command: interaction.commandName,
+    guildId: interaction.guildId,
+    userId: interaction.user.id,
+  };
+  logger.info('[Discord] Slash command received', {
+    ...commandContext,
+    ageMs: startedAt - interaction.createdTimestamp,
+  });
+
   const command = commands.get(interaction.commandName);
-  if (!command) return;
+  if (!command) {
+    logger.warn('[Discord] Slash command has no handler', commandContext);
+    return;
+  }
 
   try {
     await command.execute(interaction);
+    logger.info('[Discord] Slash command completed', {
+      ...commandContext,
+      durationMs: Date.now() - startedAt,
+      deferred: interaction.deferred,
+      replied: interaction.replied,
+    });
   } catch (error) {
     logger.error('Error executing command', {
-      command: interaction.commandName,
-      userId: interaction.user.id,
+      ...commandContext,
+      durationMs: Date.now() - startedAt,
+      deferred: interaction.deferred,
+      replied: interaction.replied,
       error: String(error),
     });
 
+    const reportFailure = (replyError: unknown): void => {
+      logger.error('[Discord] Failed to report command error', {
+        ...commandContext,
+        error: String(replyError),
+      });
+    };
     const errorMsg = '❌ Có lỗi khi thực thi lệnh này.';
     if (interaction.replied) {
       // 🛡️ Câu trả lời đã được gửi: không ghi đè, báo lỗi riêng tư bằng followUp
-      await interaction.followUp({ content: errorMsg, ephemeral: true }).catch(() => {});
+      await interaction.followUp({ content: errorMsg, ephemeral: true }).catch(reportFailure);
     } else if (interaction.deferred) {
       // 🛡️ Placeholder "thinking…" công khai: xóa đi rồi báo lỗi riêng tư
-      await sendEphemeralAfterDefer(interaction, errorMsg).catch(() => {});
+      await sendEphemeralAfterDefer(interaction, errorMsg).catch(reportFailure);
     } else {
-      await interaction.reply({ content: errorMsg, ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: errorMsg, ephemeral: true }).catch(reportFailure);
     }
   }
 }
