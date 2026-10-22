@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import { env } from './config/env';
 import { prisma } from './config/prisma';
 import { logger } from './utils/logger';
+import { monitorDiscordStartup } from './utils/discordStartupDiagnostics';
 import { registerHealthClient, startHealthServer, closeHealthServer } from './utils/healthServer';
 import { cleanupOldAiUsageLogs } from './services/cleanupService';
 import { sendWeeklyDigestToAllUsers } from './services/weeklyDigestService';
@@ -37,6 +38,7 @@ export const client = new Client({
     GatewayIntentBits.GuildMembers, // 🛡️ Cần thiết để lấy danh sách thành viên cho /leaderboard
   ],
 });
+let stopStartupDiagnostics: (() => void) | undefined;
 
 client.once(Events.ClientReady, async (readyClient) => {
   logger.info('Study Buddy Bot is ready', {
@@ -182,6 +184,7 @@ client.on(Events.VoiceStateUpdate, (oldState, newState) => {
 
 async function handleShutdown(signal: string): Promise<void> {
   logger.info(`Received ${signal}, initiating graceful shutdown...`);
+  stopStartupDiagnostics?.();
   await closeHealthServer();
   await client.destroy();
   await prisma.$disconnect();
@@ -197,8 +200,10 @@ if (process.env.NODE_ENV !== 'test') {
   // Bind HTTP before waiting for Discord or Redis recovery. Readiness stays 503 until Discord is ready.
   registerHealthClient(client);
   startHealthServer(env.healthPort);
+  stopStartupDiagnostics = monitorDiscordStartup(client);
   logger.info('[Discord] Logging in', { configuredClientId: env.clientId });
   client.login(env.discordToken).catch((err) => {
+    stopStartupDiagnostics?.();
     logger.error('Discord login failed — shutting down', { error: String(err) });
     process.exit(1);
   });

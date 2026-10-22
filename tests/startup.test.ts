@@ -7,6 +7,7 @@ const mockClient = Object.assign(new EventEmitter(), {
   ready: false,
   user: { id: 'bot-123', tag: 'Study Buddy' },
   guilds: { cache: new Map() },
+  rest: new EventEmitter(),
   isReady: () => mockClient.ready,
   login: jest.fn(() => new Promise<string>(() => {})),
   destroy: jest.fn().mockResolvedValue(undefined),
