@@ -108,14 +108,14 @@ export function startHealthServer(port: number = 3000): http.Server {
       return;
     }
 
+    const isReady = botClient?.isReady() ?? false;
     if (req.method === 'HEAD') {
-      res.writeHead(200);
+      res.writeHead(isReady ? 200 : 503);
       res.end();
       return;
     }
 
     // 🛡️ A1 & B: Response tối giản, TUYỆT ĐỐI KHÔNG lộ version, số guilds hay thông tin nội bộ
-    const isReady = botClient?.isReady() ?? false;
     if (isReady) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'ok' }));
@@ -125,7 +125,7 @@ export function startHealthServer(port: number = 3000): http.Server {
     }
   });
 
-  serverInstance.listen(port, () => {
+  serverInstance.listen(port, '0.0.0.0', () => {
     logger.info('Health check server started', { port });
   });
 

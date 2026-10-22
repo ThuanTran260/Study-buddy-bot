@@ -107,9 +107,6 @@ client.once(Events.ClientReady, async (readyClient) => {
     logger.info(`Khôi phục thành công ${resumedCount} phiên Pomodoro từ Redis.`);
   }
 
-  registerHealthClient(client);
-  startHealthServer(env.healthPort);
-
   // 1. Chạy cleanup 1 lần lúc bot khởi động để dọn dẹp log rác tồn đọng
   await cleanupOldAiUsageLogs().catch((err) => {
     logger.error('Failed to run initial cleanup on startup', { error: String(err) });
@@ -197,6 +194,10 @@ process.on('SIGINT', () => handleShutdown('SIGINT'));
 process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 
 if (process.env.NODE_ENV !== 'test') {
+  // Bind HTTP before waiting for Discord or Redis recovery. Readiness stays 503 until Discord is ready.
+  registerHealthClient(client);
+  startHealthServer(env.healthPort);
+  logger.info('[Discord] Logging in', { configuredClientId: env.clientId });
   client.login(env.discordToken).catch((err) => {
     logger.error('Discord login failed — shutting down', { error: String(err) });
     process.exit(1);
