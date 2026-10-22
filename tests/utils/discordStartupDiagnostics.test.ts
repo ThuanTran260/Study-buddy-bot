@@ -1,6 +1,11 @@
 import { Client, Events, GatewayIntentBits, RESTEvents } from 'discord.js';
 import { monitorDiscordStartup } from '../../src/utils/discordStartupDiagnostics';
 import { logger } from '../../src/utils/logger';
+import { probeDiscordGateway } from '../../src/utils/discordGatewayProbe';
+
+jest.mock('../../src/utils/discordGatewayProbe', () => ({
+  probeDiscordGateway: jest.fn().mockResolvedValue({ status: 200, durationMs: 1 }),
+}));
 
 jest.mock('../../src/utils/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
@@ -38,6 +43,7 @@ describe('Discord startup diagnostics', () => {
   });
 
   it('reports Gateway HTTP status and rate limits without logging headers or other API routes', () => {
+    client.token = 'private-token';
     stop = monitorDiscordStartup(client);
     const request = {
       route: '/gateway/bot',
@@ -55,6 +61,8 @@ describe('Discord startup diagnostics', () => {
       { route: '/interactions/private-token/callback' } as never,
       { status: 200 } as never
     );
+    jest.advanceTimersByTime(30_000);
+    expect(probeDiscordGateway).not.toHaveBeenCalled();
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith('[Discord] Gateway HTTP response', { status: 429 });
@@ -68,6 +76,22 @@ describe('Discord startup diagnostics', () => {
     ]);
     expect(output).not.toContain('private-token');
     expect(output).not.toContain('secret');
+  });
+
+  it('runs one native probe after a stalled SDK request and reports only its safe result', async () => {
+    client.token = 'private-token';
+    stop = monitorDiscordStartup(client);
+
+    jest.advanceTimersByTime(30_000);
+    await Promise.resolve();
+    jest.advanceTimersByTime(120_000);
+
+    expect(probeDiscordGateway).toHaveBeenCalledTimes(1);
+    expect(probeDiscordGateway).toHaveBeenCalledWith('private-token', expect.any(AbortSignal));
+    expect(logger.warn).toHaveBeenCalledWith('[Discord] Gateway IPv4 probe', {
+      status: 200,
+      durationMs: 1,
+    });
   });
 
   it('distinguishes WebSocket connection waits and never logs raw SDK debug messages', () => {
