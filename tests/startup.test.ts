@@ -2,6 +2,7 @@ import http from 'http';
 import { EventEmitter, once } from 'events';
 import { Events } from 'discord.js';
 import * as health from '../src/utils/healthServer';
+import * as interactionDiagnostics from '../src/utils/discordInteractionDiagnostics';
 
 const mockClient = Object.assign(new EventEmitter(), {
   ready: false,
@@ -55,11 +56,13 @@ it('opens HTTP before Discord login completes and stays reachable during session
     (signal) => [signal, processEvents.listeners(signal)] as const
   );
   const startServer = jest.spyOn(health, 'startHealthServer');
+  const monitorResponses = jest.spyOn(interactionDiagnostics, 'monitorDiscordInteractionResponses');
 
   try {
     // Exercise the real production entrypoint, with external dependencies held pending.
     process.env.NODE_ENV = 'production';
     await import('../src/index');
+    expect(monitorResponses).toHaveBeenCalledWith(mockClient);
 
     const server: http.Server | undefined = startServer.mock.results[0]?.value;
     expect(server).toBeDefined();
@@ -105,6 +108,8 @@ it('opens HTTP before Discord login completes and stays reachable during session
     if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = originalNodeEnv;
     startServer.mockRestore();
+    monitorResponses.mock.results[0]?.value?.();
+    monitorResponses.mockRestore();
   }
 });
 

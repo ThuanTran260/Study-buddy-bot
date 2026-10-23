@@ -264,6 +264,17 @@ export async function execute(interaction: Interaction): Promise<void> {
     return;
   }
 
+  const acknowledgementWarning = setTimeout(() => {
+    if (!interaction.deferred && !interaction.replied) {
+      logger.warn('[Discord] Command acknowledgement still pending', {
+        ...commandContext,
+        durationMs: Date.now() - startedAt,
+        ageMs: Date.now() - interaction.createdTimestamp,
+      });
+    }
+  }, 2000);
+  acknowledgementWarning.unref();
+
   try {
     await command.execute(interaction);
     logger.info('[Discord] Slash command completed', {
@@ -297,5 +308,7 @@ export async function execute(interaction: Interaction): Promise<void> {
     } else {
       await interaction.reply({ content: errorMsg, ephemeral: true }).catch(reportFailure);
     }
+  } finally {
+    clearTimeout(acknowledgementWarning);
   }
 }

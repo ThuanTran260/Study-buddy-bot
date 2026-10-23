@@ -199,6 +199,72 @@ describe('interactionCreate command diagnostics', () => {
       })
     );
   });
+
+  it('warns once if the actual command is still waiting for acknowledgement after two seconds', async () => {
+    jest.useFakeTimers();
+    let finish!: () => void;
+    (hoiCommand.execute as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const interaction = makeInteraction({ deferred: false, replied: false });
+    const pending = execute(interaction);
+    try {
+      jest.advanceTimersByTime(1999);
+      expect(logger.warn).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1);
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[Discord] Command acknowledgement still pending',
+        expect.objectContaining({
+          interactionId: interaction.id,
+          command: 'hoi',
+          durationMs: 2000,
+          ageMs: 2000,
+        })
+      );
+      jest.advanceTimersByTime(30_000);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
+    } finally {
+      finish();
+      await pending;
+      jest.useRealTimers();
+    }
+  });
+
+  it('clears the acknowledgement warning after a command finishes', async () => {
+    jest.useFakeTimers();
+    try {
+      (hoiCommand.execute as jest.Mock).mockResolvedValueOnce(undefined);
+      await execute(makeInteraction({ deferred: false, replied: false }));
+      jest.advanceTimersByTime(30_000);
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not warn when a long-running command has already deferred its reply', async () => {
+    jest.useFakeTimers();
+    let finish!: () => void;
+    (hoiCommand.execute as jest.Mock).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const pending = execute(makeInteraction({ deferred: true, replied: false }));
+    try {
+      jest.advanceTimersByTime(30_000);
+      expect(logger.warn).not.toHaveBeenCalled();
+    } finally {
+      finish();
+      await pending;
+      jest.useRealTimers();
+    }
+  });
 });
 
 // Invocation order of a jest mock; lower number means called earlier.
